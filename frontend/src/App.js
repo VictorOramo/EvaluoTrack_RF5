@@ -1,6 +1,6 @@
 import React from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import FichaTabs from './components/FichaTabs';
+import FichaTabs from './componentes/FichaTabs';
 
 function App() {
   return (
