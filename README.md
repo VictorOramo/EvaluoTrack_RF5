@@ -27,8 +27,8 @@ Este repositorio implementa los requisitos funcionales RF5 del proyecto EvaluoTr
 
 1. Clonar el repositorio:
 ```bash
-git clone https://github.com/DerlingR/evaluotrack-rf5-backend.git
-cd evaluotrack-rf5-backend
+git clone git@github.com:VictorOramo/EvaluoTrack_RF5.git
+cd evaluotrack_rf5/backend
 ```
 
 2. Instalar dependencias:
