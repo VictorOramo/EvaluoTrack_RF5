@@ -1,0 +1,15 @@
+.invoice-effect-top {
+    top: -20px;
+}
+
+.invoice-table {
+    tbody {
+        &:last-child {
+            border: none;
+        }
+    }
+}
+
+.invoice-signature {
+    max-width: 155px;
+}

@@ -1,0 +1,129 @@
+// 
+// _dropdown.scss
+// 
+
+.dropdown-toggle::after {
+    // content: "";
+    // position: absolute;
+    // line-height: 15px;
+    // // content: "\F0140";
+    // font-family: "Material Design Icons";
+    // display: inline-block;
+    // margin-left: .255em;
+    font-size: var(--#{$prefix}font-md);
+    display: inline-block;
+    margin-left: 0.255em;
+    line-height: 15px;
+    content: "\f0140";
+    font-family: "Material Design Icons";
+}
+
+.dropdown-menu {
+    box-shadow: $box-shadow-lg;
+    position: absolute;
+    z-index: 1000;
+
+    &.dropdown-megamenu {
+        padding: 20px;
+        left: 0 !important;
+        right: 0 !important;
+    }
+}
+
+@media (min-width: 600px) {
+    .dropdown-menu-xl {
+        width: 420px;
+    }
+
+    .dropdown-menu-lg {
+        width: 320px;
+    }
+
+    .dropdown-menu-md {
+        width: 240px;
+    }
+}
+
+.dropdown-toggle-split {
+    border-left: none;
+
+    &::after {
+        margin-left: 0px;
+    }
+
+    &:before {
+        content: "";
+        position: absolute;
+        background-color: rgba($white, 0.12);
+        top: calc(#{$btn-border-width} * -1);
+        bottom: calc(#{$btn-border-width} * -1);
+        right: calc(#{$btn-border-width} * -1);
+        left: 0;
+        border-radius: 0 $btn-border-radius $btn-border-radius 0;
+    }
+}
+
+// Dropdown Mega Menu
+.dropdown-mega {
+    position: static !important;
+}
+
+// Dropdown size
+.dropdown-mega-menu-xl {
+    width: 38rem;
+}
+
+.dropdown-mega-menu-lg {
+    width: 26rem;
+}
+
+[dir="ltr"] {
+    .dropdown-menu-start {
+        --tb-position: end;
+    }
+
+    .dropdown-menu-end {
+        --tb-position: start;
+    }
+}
+
+// Custom Dropdown with Tabs
+.dropdown-head {
+    .nav-tabs-custom {
+        border: 0;
+
+        .nav-link {
+            color: var(--#{$prefix}secondary-color);
+
+            &.active {
+                background-color: var(--#{$prefix}dropdown-bg);
+            }
+
+            &:hover {
+                color: var(--#{$prefix}dark);
+            }
+        }
+    }
+}
+
+// card color variant
+@each $state in map-keys($theme-colors) {
+
+    .dropdownmenu-#{$state} {
+        .dropdown-item {
+
+            &:is(:focus, :hover, .active) {
+                background-color: var(--#{$prefix}#{$state}-bg-subtle);
+                color: var(--#{$prefix}#{$state});
+            }
+        }
+    }
+}
+
+//arrow-none
+
+.arrow-none {
+    &::after {
+        display: none;
+    }
+}
