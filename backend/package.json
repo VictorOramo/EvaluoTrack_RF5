@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Backend para EvaluoTrack - Sistema de tasación catastral (RF5)",
   "main": "src/index.js",
-  "type": "module",
+  
   "scripts": {
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
@@ -22,7 +22,9 @@
   "author": "Grupo 3 - UAPA",
   "license": "ISC",
   "dependencies": {
-    "@prisma/client": "^5.22.0"
+    "@prisma/client": "^5.22.0",
+    "cors": "^2.8.5",
+    "express": "^5.2.1"
   },
   "devDependencies": {
     "prisma": "^5.22.0"
