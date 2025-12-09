@@ -1,0 +1,74 @@
+//
+// _datatables.scss
+//
+
+.bWdFbf {
+    .fjMIrw {
+        color: $table-color;
+        background-color: $table-bg;
+    }
+
+    .kryIMW {
+        color: $table-color;
+        font-size: $font-size-base;
+        text-align: center;
+        font-weight: $table-th-font-weight;
+    }
+
+    .dILRuI {
+        color: $table-color;
+        background-color: $table-bg;
+        border-bottom: $table-border-width solid $table-border-color;
+    }
+
+    .hOjrSE {
+        color: $table-color;
+        background-color: $table-bg;
+
+        &:not(:last-of-type) {
+            border-bottom: $table-border-width solid $table-border-color;
+        }
+    }
+
+    .epNTxY:hover,
+    .epNTxY:focus {
+        opacity: 1;
+    }
+
+    .epNTxY:hover span,
+    .epNTxY:focus span,
+    .epNTxY:hover span.__rdt_custom_sort_icon__ *,
+    .epNTxY:focus span.__rdt_custom_sort_icon__ * {
+        opacity: 1;
+    }
+
+}
+
+.kXhSWm {
+    color: $table-color !important;
+    background-color: var(--#{$prefix}body-bg) !important;
+}
+
+.fPIktX {
+    color: $table-color !important;
+    background-color: $table-bg !important;
+    border-top: $table-border-width solid $table-border-color !important;
+}
+
+.jBfPvD {
+    .hsprtj {
+        color: $table-color !important;
+        fill: $table-color !important;
+        opacity: 0.9;
+
+        &:disabled {
+            opacity: 0.5;
+        }
+    }
+}
+
+.fixed-header-datatable{
+    .dILRuI{
+        background-color: var(--#{$prefix}secondary-bg);
+    }
+}

@@ -1,0 +1,23 @@
+@import "./bootstrap.scss";
+@import "./app.scss";
+@import "./icons.scss";
+
+//rtl SCSS
+// @import "rtl/structure/structure";
+// @import "rtl/components/components";
+// @import "rtl/plugins/plugins";
+// @import "rtl/apps/apps";
+// @import "rtl/pages/pages";
+
+//Emoji picker
+aside.EmojiPickerReact.epr-main {
+    position: absolute !important;
+    bottom: 82px;
+    z-index: 2;
+    left: 23px;
+}
+
+[dir="rtl"] .EmojiPickerReact.epr-main {
+    right: 23px !important;
+    left: unset !important;
+}
