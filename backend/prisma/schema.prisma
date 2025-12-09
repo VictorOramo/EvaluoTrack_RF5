@@ -1,0 +1,128 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+// Expediente - RF5.1
+model Expediente {
+  id                String   @id @default(uuid())
+  numeroExpediente  String   @unique
+  
+  nombreSolicitante String
+  cedulaSolicitante String
+  telefonoSolicitante String?
+  emailSolicitante  String?
+  
+  direccionInmueble String
+  municipio         String
+  provincia         String
+  
+  estado            EstadoExpediente @default(PENDIENTE)
+  fechaCreacion     DateTime         @default(now())
+  fechaActualizacion DateTime        @updatedAt
+  
+  fichaCatastral    FichaCatastral?
+  anexos            Anexo[]
+  
+  @@map("expedientes")
+}
+
+enum EstadoExpediente {
+  PENDIENTE
+  EN_PROCESO
+  EN_REVISION
+  APROBADO
+  RECHAZADO
+}
+
+// Ficha Catastral - RF5.2
+model FichaCatastral {
+  id            String   @id @default(uuid())
+  expedienteId  String   @unique
+  
+  areaTerreno   Float
+  areaConstruida Float?
+  tipoInmueble  TipoInmueble
+  numeroPisos   Int?
+  numeroHabitaciones Int?
+  numeroBanos   Int?
+  antiguedad    Int?
+  estadoConservacion EstadoConservacion?
+  
+  tituloPropiedadNumero String?
+  registroPropiedad String?
+  situacionLegal    SituacionLegal @default(REGULAR)
+  
+  valorTerreno      Float?
+  valorConstruccion Float?
+  valorTotal        Float?
+  moneda            String @default("DOP")
+  
+  fechaCreacion     DateTime @default(now())
+  fechaActualizacion DateTime @updatedAt
+  
+  expediente        Expediente @relation(fields: [expedienteId], references: [id], onDelete: Cascade)
+  
+  @@map("fichas_catastrales")
+}
+
+enum TipoInmueble {
+  RESIDENCIAL
+  COMERCIAL
+  INDUSTRIAL
+  AGRICOLA
+  SOLAR
+  MIXTO
+}
+
+enum EstadoConservacion {
+  EXCELENTE
+  BUENO
+  REGULAR
+  MALO
+  RUINA
+}
+
+enum SituacionLegal {
+  REGULAR
+  IRREGULAR
+  EN_PROCESO
+  LITIGIO
+}
+
+// Anexos con coordenadas - RF5.3
+model Anexo {
+  id            String      @id @default(uuid())
+  expedienteId  String
+  
+  tipoAnexo     TipoAnexo
+  nombreArchivo String
+  rutaArchivo   String
+  tamanoBytes   Int
+  mimeType      String
+  
+  coordenadas   Unsupported("geometry(Point, 4326)")?
+  
+  descripcion   String?
+  fechaSubida   DateTime    @default(now())
+  
+  expediente    Expediente  @relation(fields: [expedienteId], references: [id], onDelete: Cascade)
+  
+  @@map("anexos")
+  @@index([expedienteId])
+}
+
+enum TipoAnexo {
+  FOTOGRAFIA
+  PLANO
+  TITULO_PROPIEDAD
+  DOCUMENTO_IDENTIFICACION
+  COORDENADAS
+  OTRO
+}
