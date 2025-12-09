@@ -13,7 +13,7 @@ import Fourzerofour from "pages/AuthenticationInner/Errors/404Error";
 import Fivezerozero from "pages/AuthenticationInner/Errors/500Error";
 import Fivezerothree from "pages/AuthenticationInner/Errors/503Error";
 import OfflinePage from "pages/AuthenticationInner/Errors/Offline";
-
+import AvaluoWizard from "pages/Avaluos/AvaluoWizard";
 
 // Pages
 import Starterpages from "pages/Pages/Starter/Starterpage";
@@ -200,8 +200,13 @@ import Logout from "pages/Authentication/Logout";
 import Register from "pages/Authentication/Register";
 import ForgotPassword from "pages/Authentication/ForgotPassword";
 import UserProfile from "pages/Authentication/user-profile";
+import path from "path";
 
 const authProtectedRoutes = [
+
+    //Avaluo Wizard
+    { path: "/avaluo/create", name : "AvaluoWizard" ,component: <AvaluoWizard /> },
+
     // Dashboard
     { path: "/dashboard", component: <Ecommerce /> },
     { path: "/", exact: true ,component: <Navigate to="/dashboard" /> },
