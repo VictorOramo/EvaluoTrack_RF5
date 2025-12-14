@@ -1,33 +1,44 @@
-/* src/pages/Avaluo/avaluo-form.scss */
-.avaluo-card {
-  margin-top: 1.75rem; /* evita que quede oculto por el header */
-  padding: 1rem;
-  .wizard-steps {
-    margin-bottom: 0.75rem;
-    small { color: #666; }
+.avaluo-steps {
+  .step-indicator {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    list-style: none;
+    padding: 0;
+    margin: 0;
   }
-  .map-placeholder {
-    height: 180px;
-    border-radius: 6px;
-    border: 1px dashed #ced4da;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    cursor: pointer;
-    background: linear-gradient(180deg, #fafafa, #fff);
+
+  .step-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    opacity: 0.5;
+
+    &.active {
+      font-weight: 600;
+      opacity: 1;
+      color: var(--bs-primary);
+    }
+
+    &.completed {
+      opacity: 0.8;
+      color: var(--bs-success);
+    }
+
+    .step-number {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--bs-secondary-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+    }
   }
 }
-
-/* responsive adjustments */
-@media (max-width: 767px) {
-  .avaluo-card {
-    margin-top: 4.5rem;
-    padding: 0.5rem;
-    .map-placeholder { height: 160px; }
-  }
-}
-
-.avaluo-wrapper {
-  padding-top: 65px;
-  padding-bottom: 35px;
+.avaluo-container {
+  padding-top: 1.5rem; // evita choque con navbar
+  padding-bottom: 2rem;
+  max-width: 100%;
 }
