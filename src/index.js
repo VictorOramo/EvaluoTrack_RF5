@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import expedientesRoutes from './routes/expedientes.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,6 +26,8 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+app.use('/api/expedientes', expedientesRoutes);
 
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
