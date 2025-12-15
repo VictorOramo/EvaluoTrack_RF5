@@ -116,7 +116,7 @@ Ambos comandos deben mostrar mensajes de éxito.
 - [Configuración de Supabase](docs/SUPABASE.md)
 
 ## Equipo
-
+    
 **Grupo 3 - UAPA**
 
 ## Sprint 1 - Entregables
