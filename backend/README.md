@@ -15,7 +15,8 @@ Este repositorio implementa los requisitos funcionales RF5 del proyecto EvaluoTr
 - Node.js 18+
 - PostgreSQL 15 con PostGIS 3.3
 - Prisma ORM 5.22
-- Supabase
+- Express 5.2
+- Supabase (base de datos compartida en la nube)
 
 ## Requisitos Previos
 
@@ -55,10 +56,24 @@ npm run db:seed
 
 ## Estructura del Proyecto
 
-**Carpeta src/config/**
-- `database.js` - Configuración de Prisma
-- `testConnection.js` - Script de prueba de conexión
-- `testPostGIS.js` - Script de validación PostGIS
+**Carpeta src/**
+- `index.js` - Servidor Express principal
+- `config/`
+  - `database.js` - Configuración de Prisma
+  - `testConnection.js` - Script de prueba de conexión
+  - `testPostGIS.js` - Script de validación PostGIS
+  - `keepAlive.js` - Script para mantener Supabase activo
+- `controllers/` - Lógica de negocio de la API
+  - `expedientes.controller.js`
+  - `fichas.controller.js`
+  - `anexos.controller.js`
+- `routes/` - Definición de rutas de la API
+  - `expedientes.routes.js`
+  - `fichas.routes.js`
+  - `anexos.routes.js`
+- `middleware/` - Middlewares personalizados
+  - `validators.js` - Validaciones de datos
+  - `errorHandler.js` - Manejo de errores
 
 **Carpeta prisma/**
 - `schema.prisma` - Modelos de datos
@@ -66,15 +81,17 @@ npm run db:seed
 - `seed.js` - Datos de prueba
 
 **Carpeta docs/**
+- `API.md` - Documentación de endpoints REST
 - `Configuraciones.md` - Guía de instalación detallada
 - `DATABASE.md` - Estructura de la base de datos
 - `SUPABASE.md` - Configuración de Supabase
+- `TESTING.md` - Guía de pruebas de API
 
 **Archivos principales:**
 - `.env.example` - Plantilla de variables de entorno
 - `.gitignore` - Archivos ignorados por Git
 - `package.json` - Dependencias y scripts
-```
+- `ENTREGABLES.md` - Resumen de entregables del sprint
 
 ## Modelos de Datos
 
@@ -88,6 +105,14 @@ Aspectos físicos, jurídicos y económicos del inmueble conforme a normativas D
 Documentos adjuntos (fotografías, planos, títulos) con soporte para coordenadas geoespaciales mediante PostGIS.
 
 ## Scripts Disponibles
+
+**API y Servidor:**
+```bash
+npm start                 # Iniciar servidor en producción
+npm run dev              # Iniciar servidor en desarrollo (hot-reload)
+```
+
+**Base de Datos:**
 ```bash
 npm run db:migrate        # Aplicar migraciones a la base de datos
 npm run db:deploy         # Aplicar migraciones en producción
@@ -95,9 +120,39 @@ npm run db:seed          # Poblar base de datos con datos de prueba
 npm run db:studio        # Abrir Prisma Studio (interfaz visual de la BD)
 npm run db:reset         # Resetear base de datos (elimina todos los datos)
 npm run db:generate      # Regenerar cliente de Prisma
+```
+
+**Utilidades:**
+```bash
 npm run test:db          # Probar conexión a la base de datos
 npm run test:postgis     # Validar funcionamiento de PostGIS
+npm run keep-alive       # Mantener proyecto Supabase activo
 ```
+
+## API REST
+
+El servidor expone una API REST completa para gestionar expedientes, fichas catastrales y anexos.
+
+**Iniciar servidor:**
+```bash
+npm start        # Producción
+npm run dev      # Desarrollo (con hot-reload)
+```
+
+**Endpoints principales:**
+
+- `POST /api/expedientes` - Crear expediente
+- `GET /api/expedientes` - Listar expedientes (con paginación)
+- `GET /api/expedientes/:id` - Obtener expediente
+- `PUT /api/expedientes/:id` - Actualizar expediente
+- `DELETE /api/expedientes/:id` - Eliminar expediente
+- `POST /api/fichas` - Crear ficha catastral
+- `GET /api/fichas/expediente/:expedienteId` - Obtener ficha por expediente
+- `POST /api/anexos` - Crear anexo
+- `GET /api/anexos/expediente/:expedienteId` - Listar anexos
+- `POST /api/anexos/:id/coordenadas` - Agregar coordenadas GPS
+
+Ver documentación completa en [docs/API.md](docs/API.md)
 
 ## Verificación de Instalación
 
@@ -109,11 +164,21 @@ npm run test:postgis
 
 Ambos comandos deben mostrar mensajes de éxito.
 
+Para probar la API:
+```bash
+npm run dev
+# En otra terminal:
+curl http://localhost:3000
+```
+
 ## Documentación Adicional
 
 - [Guía de Configuración Completa](docs/Configuraciones.md)
 - [Estructura de Base de Datos](docs/DATABASE.md)
 - [Configuración de Supabase](docs/SUPABASE.md)
+- [API REST - Endpoints](docs/API.md)
+- [Guía de Pruebas de API](docs/TESTING.md)
+- [Resumen de Entregables](ENTREGABLES.md)
 
 ## Equipo
 
@@ -124,5 +189,6 @@ Ambos comandos deben mostrar mensajes de éxito.
 - Configuración de PostgreSQL + PostGIS en Supabase
 - Modelos de datos: Expediente, FichaCatastral, Anexo
 - Migraciones de base de datos aplicadas
+- API REST completa con validaciones
 - Scripts de validación y datos de prueba
 - Documentación técnica completa

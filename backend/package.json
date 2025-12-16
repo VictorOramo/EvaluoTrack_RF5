@@ -5,6 +5,8 @@
   "main": "src/index.js",
   
   "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "node prisma/seed.js",
@@ -12,7 +14,8 @@
     "db:reset": "prisma migrate reset",
     "db:generate": "prisma generate",
     "test:db": "node src/config/testConnection.js",
-    "test:postgis": "node src/config/testPostGIS.js"
+    "test:postgis": "node src/config/testPostGIS.js",
+    "keep-alive": "node src/config/keepAlive.js"
   },
   "keywords": [
     "catastro",
@@ -27,6 +30,7 @@
     "express": "^5.2.1"
   },
   "devDependencies": {
+    "nodemon": "^3.1.11",
     "prisma": "^5.22.0"
   }
 }

@@ -1,0 +1,209 @@
+### ====================================
+### API EvaluoTrack - Ejemplos de Peticiones
+### ====================================
+
+@baseUrl = http://localhost:3000
+@contentType = application/json
+
+### ====================================
+### HEALTH CHECK
+### ====================================
+
+### Verificar estado del servidor
+GET {{baseUrl}}/health
+
+### Página principal de la API
+GET {{baseUrl}}/
+
+
+### ====================================
+### EXPEDIENTES
+### ====================================
+
+### Listar todos los expedientes
+GET {{baseUrl}}/api/expedientes
+
+### Listar expedientes con paginación
+GET {{baseUrl}}/api/expedientes?page=1&limit=5
+
+### Listar expedientes por estado
+GET {{baseUrl}}/api/expedientes?estado=PENDIENTE
+
+### Obtener expediente por ID (reemplazar con ID real)
+GET {{baseUrl}}/api/expedientes/46de4ed1-4deb-4d73-9d4b-cede5c7d36bb
+
+### Crear nuevo expediente
+POST {{baseUrl}}/api/expedientes
+Content-Type: {{contentType}}
+
+{
+  "numeroExpediente": "EXP-2025-0004",
+  "nombreSolicitante": "Ana García López",
+  "cedulaSolicitante": "001-1234567-8",
+  "telefonoSolicitante": "809-555-0000",
+  "emailSolicitante": "ana.garcia@email.com",
+  "direccionInmueble": "Calle Ejemplo #10, Bella Vista",
+  "municipio": "Santo Domingo",
+  "provincia": "Distrito Nacional",
+  "estado": "PENDIENTE"
+}
+
+### Actualizar expediente (reemplazar ID)
+PUT {{baseUrl}}/api/expedientes/46de4ed1-4deb-4d73-9d4b-cede5c7d36bb
+Content-Type: {{contentType}}
+
+{
+  "estado": "EN_REVISION",
+  "telefonoSolicitante": "809-555-9999"
+}
+
+### Eliminar expediente (reemplazar ID)
+DELETE {{baseUrl}}/api/expedientes/REEMPLAZAR-CON-ID
+
+### Crear expediente con datos incompletos (debe fallar)
+POST {{baseUrl}}/api/expedientes
+Content-Type: {{contentType}}
+
+{
+  "numeroExpediente": "EXP-2025-0005"
+}
+
+
+### ====================================
+### FICHAS CATASTRALES
+### ====================================
+
+### Obtener ficha por expediente (reemplazar ID)
+GET {{baseUrl}}/api/fichas/expediente/46de4ed1-4deb-4d73-9d4b-cede5c7d36bb
+
+### Crear ficha catastral (reemplazar expedienteId con uno válido)
+POST {{baseUrl}}/api/fichas
+Content-Type: {{contentType}}
+
+{
+  "expedienteId": "REEMPLAZAR-CON-ID-EXPEDIENTE",
+  "areaTerreno": 300.0,
+  "areaConstruida": 200.0,
+  "tipoInmueble": "RESIDENCIAL",
+  "numeroPisos": 2,
+  "numeroHabitaciones": 4,
+  "numeroBanos": 3,
+  "antiguedad": 3,
+  "estadoConservacion": "EXCELENTE",
+  "tituloPropiedadNumero": "TIT-2025-1234",
+  "registroPropiedad": "REG-SD-2025-567",
+  "situacionLegal": "REGULAR",
+  "valorTerreno": 4000000,
+  "valorConstruccion": 6000000,
+  "valorTotal": 10000000,
+  "moneda": "DOP"
+}
+
+### Actualizar ficha catastral (reemplazar ID)
+PUT {{baseUrl}}/api/fichas/15d1fc33-2c85-48c0-8b96-b9369baad61c
+Content-Type: {{contentType}}
+
+{
+  "valorTotal": 8500000,
+  "estadoConservacion": "BUENO"
+}
+
+### Eliminar ficha catastral (reemplazar ID)
+DELETE {{baseUrl}}/api/fichas/REEMPLAZAR-CON-ID
+
+### Crear ficha con datos inválidos (debe fallar)
+POST {{baseUrl}}/api/fichas
+Content-Type: {{contentType}}
+
+{
+  "expedienteId": "test-id",
+  "areaTerreno": -100,
+  "tipoInmueble": "TIPO_INVALIDO"
+}
+
+
+### ====================================
+### ANEXOS
+### ====================================
+
+### Listar anexos de un expediente (reemplazar ID)
+GET {{baseUrl}}/api/anexos/expediente/46de4ed1-4deb-4d73-9d4b-cede5c7d36bb
+
+### Obtener anexo por ID (reemplazar ID)
+GET {{baseUrl}}/api/anexos/570691a1-ace4-4da0-bad7-dcfcebb36d49
+
+### Crear anexo (reemplazar expedienteId)
+POST {{baseUrl}}/api/anexos
+Content-Type: {{contentType}}
+
+{
+  "expedienteId": "46de4ed1-4deb-4d73-9d4b-cede5c7d36bb",
+  "tipoAnexo": "FOTOGRAFIA",
+  "nombreArchivo": "interior-sala.jpg",
+  "rutaArchivo": "/uploads/exp-0001/interior-sala.jpg",
+  "tamanoBytes": 1548000,
+  "mimeType": "image/jpeg",
+  "descripcion": "Fotografía del interior - sala principal"
+}
+
+### Eliminar anexo (reemplazar ID)
+DELETE {{baseUrl}}/api/anexos/REEMPLAZAR-CON-ID
+
+
+### ====================================
+### COORDENADAS GEOESPACIALES (PostGIS)
+### ====================================
+
+### Obtener anexos con coordenadas de un expediente
+GET {{baseUrl}}/api/anexos/expediente/02935903-69f6-4ac6-b612-36e03f150297/coordenadas
+
+### Agregar coordenadas a un anexo (reemplazar ID del anexo)
+POST {{baseUrl}}/api/anexos/fcc136c4-e1ea-4025-918c-6c898dca3763/coordenadas
+Content-Type: {{contentType}}
+
+{
+  "latitud": 18.4861,
+  "longitud": -69.9312
+}
+
+### Agregar coordenadas de otra ubicación (Punta Cana)
+POST {{baseUrl}}/api/anexos/REEMPLAZAR-CON-ID-ANEXO/coordenadas
+Content-Type: {{contentType}}
+
+{
+  "latitud": 18.5601,
+  "longitud": -68.3725
+}
+
+### Agregar coordenadas inválidas (debe fallar)
+POST {{baseUrl}}/api/anexos/REEMPLAZAR-CON-ID-ANEXO/coordenadas
+Content-Type: {{contentType}}
+
+{
+  "latitud": 100,
+  "longitud": -200
+}
+
+
+### ====================================
+### CASOS DE ERROR
+### ====================================
+
+### Ruta no encontrada (404)
+GET {{baseUrl}}/api/ruta-inexistente
+
+### Expediente no encontrado (404)
+GET {{baseUrl}}/api/expedientes/00000000-0000-0000-0000-000000000000
+
+### Cédula con formato inválido (400)
+POST {{baseUrl}}/api/expedientes
+Content-Type: {{contentType}}
+
+{
+  "numeroExpediente": "EXP-2025-0006",
+  "nombreSolicitante": "Test Usuario",
+  "cedulaSolicitante": "123456789",
+  "direccionInmueble": "Calle Test",
+  "municipio": "Test",
+  "provincia": "Test"
+}
