@@ -85,6 +85,7 @@ npm run db:seed
 - `Configuraciones.md` - Guía de instalación detallada
 - `DATABASE.md` - Estructura de la base de datos
 - `SUPABASE.md` - Configuración de Supabase
+- `TESTING.md` - Guía de pruebas de API
 
 **Archivos principales:**
 - `.env.example` - Plantilla de variables de entorno
@@ -176,6 +177,7 @@ curl http://localhost:3000
 - [Estructura de Base de Datos](docs/DATABASE.md)
 - [Configuración de Supabase](docs/SUPABASE.md)
 - [API REST - Endpoints](docs/API.md)
+- [Guía de Pruebas de API](docs/TESTING.md)
 - [Resumen de Entregables](ENTREGABLES.md)
 
 ## Equipo
