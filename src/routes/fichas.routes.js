@@ -5,12 +5,13 @@ import {
   actualizarFicha,
   eliminarFicha
 } from '../controllers/fichas.controller.js';
+import { validarFichaCatastral } from '../middleware/validators.js';
 
 const router = Router();
 
-router.post('/', crearFicha);
+router.post('/', validarFichaCatastral, crearFicha);
 router.get('/expediente/:expedienteId', obtenerFichaPorExpediente);
-router.put('/:id', actualizarFicha);
+router.put('/:id', validarFichaCatastral, actualizarFicha);
 router.delete('/:id', eliminarFicha);
 
 export default router;

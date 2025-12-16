@@ -3,6 +3,7 @@ import cors from 'cors';
 import expedientesRoutes from './routes/expedientes.routes.js';
 import fichasRoutes from './routes/fichas.routes.js';
 import anexosRoutes from './routes/anexos.routes.js';
+import { notFound, errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -32,6 +33,9 @@ app.get('/health', (req, res) => {
 app.use('/api/expedientes', expedientesRoutes);
 app.use('/api/fichas', fichasRoutes);
 app.use('/api/anexos', anexosRoutes);
+
+app.use(notFound);
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
