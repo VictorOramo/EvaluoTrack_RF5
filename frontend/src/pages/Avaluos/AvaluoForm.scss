@@ -1,45 +1,44 @@
-// _avaluo.scss
-
-:root {
-  --primary-color: #0d6efd;
-  --accent-color: #6610f2;
-  --bg-card: #ffffff;
-  --text-color: #222;
-}
-
-.avaluo-form-wrapper {
-  padding-top: 90px; // evita solapamiento con el menu superior
-  padding-bottom: 40px;
-  color: var(--text-color);
-
-  .wizard-steps {
-    font-weight: 600;
-    color: var(--primary-color);
+.avaluo-steps {
+  .step-indicator {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    list-style: none;
+    padding: 0;
+    margin: 0;
   }
 
-  .photo-previews {
-    .preview {
-      position: relative;
-      width: 120px;
-      height: 90px;
-      img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        border-radius: 6px;
-        box-shadow: 0 0 4px rgba(0,0,0,0.08);
-      }
-      button {
-        position: absolute;
-        top: 6px;
-        right: 6px;
-      }
+  .step-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    opacity: 0.5;
+
+    &.active {
+      font-weight: 600;
+      opacity: 1;
+      color: var(--bs-primary);
+    }
+
+    &.completed {
+      opacity: 0.8;
+      color: var(--bs-success);
+    }
+
+    .step-number {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--bs-secondary-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
     }
   }
-
-  // responsive tweaks
-  @media (max-width: 767px) {
-    padding-top: 120px;
-    .photo-previews { .preview { width: 90px; height: 70px; } }
-  }
+}
+.avaluo-container {
+  padding-top: 1.5rem; // evita choque con navbar
+  padding-bottom: 2rem;
+  max-width: 100%;
 }

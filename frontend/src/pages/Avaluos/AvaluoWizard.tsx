@@ -1,690 +1,864 @@
 import React, { useState, useEffect } from "react";
-import { Formik, Form as FormikForm, FieldArray } from "formik";
+import { Card, Col, Row, Button, Form, InputGroup, Alert } from "react-bootstrap";
+import { useFormik } from "formik";
 import * as Yup from "yup";
-import {
-  Container,
-  Row,
-  Col,
-  Card,
-  Button,
-  Form,
-  Alert,
-  InputGroup,
-} from "react-bootstrap";
+import { convertFilesToBase64 } from "../../Utils/fileHelpers";
+import { saveAvaluo, loadAvaluo, clearAvaluo } from "../../Utils/storageAvaulo";
 import "./AvaluoForm.scss";
 
 /**
- * AvaluoForm.tsx
- * Formulario por pasos (wizard) para Informe de Avalúo de Propiedad
- * Guarda en localStorage como demo, fotos en base64 (máx 15).
+ * Multi-step form (wizard) for Avaluo de Propiedad.
+ * - Guarda en localStorage (saveAvaluo)
+ * - Soporta hasta 15 fotos (base64)
+ * - Responsive y usa SCSS
  */
 
-// tipos (simplificados)
-type Room = {
-  name: string;
-  area?: number | "";
-};
+const MAX_PHOTOS = 15;
 
 type Comparable = {
-  address: string;
-  saleDate?: string;
-  price?: number | "";
-  m2?: number | "";
-  adjustments?: string;
+  direccion: string;
+  fechaVenta: string;
+  precio: number | "";
+  m2: number | "";
+  ajustes: string;
+};
+
+type Habitacion = {
+  piso: string;
+  nombre: string;
 };
 
 type FormValues = {
   // Información inicial
-  address_street: string;
-  address_number: string;
-  address_sector: string;
-  address_city: string;
-  latitude: string;
-  longitude: string;
-  owner_name: string;
-  owner_phone: string;
-  owner_email: string;
-  valuador_name: string;
-  valuador_id: string;
-  applicant_name: string;
-  purpose: string;
+  calle: string;
+  numero: string;
+  sector: string;
+  ciudad: string;
+  lat: string;
+  lng: string;
+  coordenadasComentario: string;
+  propietarioNombre: string;
+  propietarioTelefono: string;
+  propietarioEmail: string;
+  valuadorNombre: string;
+  valuadorIdentificacion: string;
+  solicitanteNombre: string;
+  proposito: string;
 
-  // Vecindad
-  neighborhood_type: string;
-  neighborhood_trend: string;
-  distances: string;
-  neighborhood_summary: string;
+  // Vecindad (resumido)
+  tipoVecindad: string;
+  tendenciaVecindad: string;
+  comparacionVecindario: string;
+  antiguedadPromedio: number | "";
+  oferta: string;
+  demanda: string;
+  distanciaEscuelaPrimaria: string;
+  distanciaEscuelaSecundaria: string;
+  distanciaTransporte: string;
+  distanciaComercios: string;
+  distanciaCentroCiudad: string;
+  deseabilidad: string;
+  resumenFactores: string;
 
   // Zona
-  services: { water: boolean; sewer: boolean; electricity: boolean; gas: boolean; cable: boolean };
-  topography: string;
-  zoning: string;
-  area_m2: number | "";
-  zone_comments: string;
+  limitesNaturales: string;
+  areaM2: number | "";
+  tipoTerreno: string;
+  usoSuelo: string;
+  configuracion: string;
+  zonificacion: string;
+  posee: string[]; // checkboxes
+  servicios: string[]; // checkboxes
+  usoConforme: string;
+  paisajismo: string;
+  servidumbre: string;
+  entradaSalida: string[]; // checkboxes
+  instalacionElectrica: string;
+  zonaComentarios: string;
 
-  // Mejoras & Interior
-  year_built: number | "";
-  general_condition: string;
-  materials: string;
-  interior_description: string;
+  // Mejoras / interior
+  anioConstruccion: number | "";
+  construccionTerminada: boolean;
+  pisos: { pisosCount: number; areas: number[] };
+  edadEfectiva: number | "";
+  antiguedadAprox: number | "";
+  porcentajeTerminacion: number | "";
+  vidaEstimadAnios: number | "";
+  sotano: string;
+  sotanoArea: number | "";
+  tipoInmueble: string[]; // checkboxes
+  estructura: string;
+  materialesConstruccion: string[]; // checkboxes
+  marcosVentanas: string;
+  revestimientoExterior: string[]; // checkboxes
+  materialTecho: string[]; // checkboxes
+  condicionGeneralExterna: string;
+  mejorasComentarios: string;
 
-  // Distribucion
-  bedrooms: number | "";
-  bathrooms: number | "";
-  parking: number | "";
-  rooms: Room[];
+  // Interior / distribución
+  pisosMateriales: string[]; // checkboxes
+  distribucionArquitectonica: string;
+  armarios: string;
+  dormitoriosTamano: string;
+  cantidadBanos: string;
+  calidadBanos: string;
+  condicionGeneralInterna: string;
+  paredesMateriales: string;
+  techosMateriales: string;
+  otrosDetalles: string;
+  murosCimientos: string;
+  tuberias: string;
+  instalacionSanitaria: string[];
+  calentadorAgua: string;
+  sistemaElectrico: string[];
+  artefactosInstalaciones: string[];
+  interiorComentarios: string;
 
-  // Comparables / enfoque
+  // habitaciones repetibles
+  habitaciones: Habitacion[];
+
+  // costos
+  fuentesDatosCosto: string[]; // checkboxes
+  tituloApartamento: string;
+  costo: number | "";
+  otrasEdificaciones: number | "";
+  costoReposicionTotal: number | "";
+
+  // comparables
   comparables: Comparable[];
 
-  // Fotos
-  photos: string[]; // base64 strings
+  // fotos
+  fotos: string[]; // base64
 
-  // Conclusiones / valor
-  market_value: number | "";
-  liquidation_value: number | "";
-  conclusions: string;
-};
-
-const MAX_PHOTOS = 15;
-
-// validation schemas por paso
-const validationSchemas = [
-  // Paso 0: Información inicial
-  Yup.object().shape({
-    address_street: Yup.string().required("Calle es obligatoria"),
-    address_city: Yup.string().required("Ciudad es obligatoria"),
-    owner_name: Yup.string().required("Propietario es obligatorio"),
-    valuador_name: Yup.string().required("Valuador es obligatorio"),
-    purpose: Yup.string().required("Propósito es obligatorio"),
-  }),
-  // Paso 1: Vecindad
-  Yup.object().shape({
-    neighborhood_type: Yup.string().required("Tipo de vecindad es obligatorio"),
-  }),
-  // Paso 2: Zona
-  Yup.object().shape({
-    area_m2: Yup.number().typeError("Área debe ser número").required("Área es obligatoria"),
-  }),
-  // Paso 3: Mejoras & Interior
-  Yup.object().shape({
-    year_built: Yup.number().typeError("Año debe ser número").nullable(),
-    general_condition: Yup.string().required("Estado general es obligatorio"),
-  }),
-  // Paso 4: Distribución
-  Yup.object().shape({
-    bedrooms: Yup.number().typeError("Debe ser número").required("Requerido"),
-    bathrooms: Yup.number().typeError("Debe ser número").required("Requerido"),
-  }),
-  // Paso 5: Comparables & Fotos
-  Yup.object().shape({
-    comparables: Yup.array().of(
-      Yup.object().shape({
-        address: Yup.string().required(),
-        price: Yup.number().typeError("Precio debe ser número").nullable(),
-      })
-    ),
-    photos: Yup.array().max(MAX_PHOTOS, `Máximo ${MAX_PHOTOS} fotos`),
-  }),
-  // Paso 6: Conclusiones / Valor
-  Yup.object().shape({
-    market_value: Yup.number().typeError("Debe ser número").required("Valor de mercado es obligatorio"),
-    liquidation_value: Yup.number().typeError("Debe ser número").required("Valor de liquidación es obligatorio"),
-  }),
-];
+  // conclusiones
+  valorEstimadoMercado: number | "";
+  valorLiquidacion: number | "";
+  conclusiones: string;
+}
 
 const initialValues: FormValues = {
-  address_street: "",
-  address_number: "",
-  address_sector: "",
-  address_city: "",
-  latitude: "",
-  longitude: "",
-  owner_name: "",
-  owner_phone: "",
-  owner_email: "",
-  valuador_name: "",
-  valuador_id: "",
-  applicant_name: "",
-  purpose: "",
+  calle: "",
+  numero: "",
+  sector: "",
+  ciudad: "",
+  lat: "",
+  lng: "",
+  coordenadasComentario: "",
+  propietarioNombre: "",
+  propietarioTelefono: "",
+  propietarioEmail: "",
+  valuadorNombre: "",
+  valuadorIdentificacion: "",
+  solicitanteNombre: "",
+  proposito: "",
 
-  neighborhood_type: "",
-  neighborhood_trend: "",
-  distances: "",
-  neighborhood_summary: "",
+  tipoVecindad: "",
+  tendenciaVecindad: "",
+  comparacionVecindario: "",
+  antiguedadPromedio: "",
+  oferta: "",
+  demanda: "",
+  distanciaEscuelaPrimaria: "",
+  distanciaEscuelaSecundaria: "",
+  distanciaTransporte: "",
+  distanciaComercios: "",
+  distanciaCentroCiudad: "",
+  deseabilidad: "",
+  resumenFactores: "",
 
-  services: { water: true, sewer: true, electricity: true, gas: false, cable: false },
-  topography: "",
-  zoning: "",
-  area_m2: "",
-  zone_comments: "",
+  limitesNaturales: "",
+  areaM2: "",
+  tipoTerreno: "",
+  usoSuelo: "",
+  configuracion: "",
+  zonificacion: "",
+  posee: [],
+  servicios: [],
+  usoConforme: "Si",
+  paisajismo: "",
+  servidumbre: "",
+  entradaSalida: [],
+  instalacionElectrica: "",
+  zonaComentarios: "",
 
-  year_built: "",
-  general_condition: "",
-  materials: "",
-  interior_description: "",
+  anioConstruccion: "",
+  construccionTerminada: false,
+  pisos: { pisosCount: 1, areas: [0] },
+  edadEfectiva: "",
+  antiguedadAprox: "",
+  porcentajeTerminacion: "",
+  vidaEstimadAnios: "",
+  sotano: "No posee",
+  sotanoArea: "",
+  tipoInmueble: [],
+  estructura: "",
+  materialesConstruccion: [],
+  marcosVentanas: "",
+  revestimientoExterior: [],
+  materialTecho: [],
+  condicionGeneralExterna: "",
+  mejorasComentarios: "",
 
-  bedrooms: "",
-  bathrooms: "",
-  parking: "",
-  rooms: [],
+  pisosMateriales: [],
+  distribucionArquitectonica: "",
+  armarios: "",
+  dormitoriosTamano: "",
+  cantidadBanos: "",
+  calidadBanos: "",
+  condicionGeneralInterna: "",
+  paredesMateriales: "",
+  techosMateriales: "",
+  otrosDetalles: "",
+  murosCimientos: "",
+  tuberias: "",
+  instalacionSanitaria: [],
+  calentadorAgua: "",
+  sistemaElectrico: [],
+  artefactosInstalaciones: [],
+  interiorComentarios: "",
 
-  comparables: [{ address: "", saleDate: "", price: "", m2: "", adjustments: "" }],
+  habitaciones: [],
 
-  photos: [],
+  fuentesDatosCosto: [],
+  tituloApartamento: "Apartamento",
+  costo: "",
+  otrasEdificaciones: "",
+  costoReposicionTotal: "",
 
-  market_value: "",
-  liquidation_value: "",
-  conclusions: "",
+  comparables: [],
+
+  fotos: [],
+
+  valorEstimadoMercado: "",
+  valorLiquidacion: "",
+  conclusiones: ""
 };
 
-const AvaluoForm: React.FC = () => {
-  const [step, setStep] = useState<number>(0);
-  const [savedAlert, setSavedAlert] = useState<string | null>(null);
+const schema = Yup.object().shape({
+  calle: Yup.string().required("Calle es requerida"),
+  numero: Yup.string(),
+  ciudad: Yup.string().required("Ciudad requerida"),
+  propietarioNombre: Yup.string().required("Nombre del propietario requerido"),
+  // ... puedes extender validaciones
+});
 
-  // helper: convierte FileList a base64
-  const filesToBase64 = (files: FileList | null): Promise<string[]> => {
-    if (!files) return Promise.resolve([]);
-    const arr = Array.from(files).slice(0, MAX_PHOTOS);
-    const readers = arr.map(
-      (file) =>
-        new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            resolve(String(reader.result));
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        })
-    );
-    return Promise.all(readers);
-  };
+export default function FormAvaluo() {
+  const [step, setStep] = useState<number>(1);
+  const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
-  // guardar en localStorage (vector de envíos)
-  const persistToLocal = (values: FormValues) => {
-    const key = "avaluo_submissions";
-    try {
-      const prevRaw = localStorage.getItem(key);
-      const prev = prevRaw ? JSON.parse(prevRaw) : [];
-      prev.push({ id: Date.now(), ...values });
-      localStorage.setItem(key, JSON.stringify(prev));
-      setSavedAlert("Formulario guardado localmente.");
-      setTimeout(() => setSavedAlert(null), 3500);
-    } catch (err) {
-      console.error("Error persistiendo:", err);
+  const saved = loadAvaluo();
+  const formik = useFormik({
+    initialValues: saved || initialValues,
+    validationSchema: schema,
+    onSubmit: (values) => {
+      // save to localStorage
+      saveAvaluo(values);
+      setSavedMessage("Formulario guardado en localStorage");
+      setTimeout(() => setSavedMessage(null), 3000);
     }
+  });
+
+  useEffect(() => {
+    // auto-save to localStorage on change (debounced would be better)
+    saveAvaluo(formik.values);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formik.values]);
+
+  // file handler
+  const handleFileChange = async (files: FileList | null) => {
+    if (!files) return;
+    const list = Array.from(files).slice(0, MAX_PHOTOS);
+    const base64s = await convertFilesToBase64(list);
+    formik.setFieldValue("fotos", base64s);
   };
+
+  // helpers for repeatable comparables and habitaciones
+  const addComparable = () => {
+    const arr = formik.values.comparables.slice();
+    arr.push({ direccion: "", fechaVenta: "", precio: "", m2: "", ajustes: "" });
+    formik.setFieldValue("comparables", arr);
+  };
+  const removeComparable = (i: number) => {
+    const arr = formik.values.comparables.slice();
+    arr.splice(i, 1);
+    formik.setFieldValue("comparables", arr);
+  };
+
+  const addHabitacion = () => {
+    const arr = formik.values.habitaciones.slice();
+    arr.push({ piso: "", nombre: "" });
+    formik.setFieldValue("habitaciones", arr);
+  };
+  const removeHabitacion = (i: number) => {
+    const arr = formik.values.habitaciones.slice();
+    arr.splice(i, 1);
+    formik.setFieldValue("habitaciones", arr);
+  };
+
+  // small UI helpers
+  const next = () => setStep((s) => Math.min(8, s + 1));
+  const prev = () => setStep((s) => Math.max(1, s - 1));
 
   return (
-    <div className="avaluo-form-wrapper">
-      <Container fluid="lg">
-        <Row className="justify-content-center">
-          <Col lg={10}>
-            <Card className="mb-4">
-              <Card.Body>
-                <h3 className="mb-3">Informe de Avalúo de Propiedad</h3>
-                <div className="wizard-steps mb-3">
-                  Step {step + 1} / 7
-                </div>
+    <div className="avaluo-page container-fluid">
+      <Card className="mb-4">
+        <Card.Body>
+          <h3>Formulario de Avalúo de Propiedad</h3>
+          <p className="text-muted">Paso {step} de 8</p>
+          {savedMessage && <Alert variant="success">{savedMessage}</Alert>}
 
-                {savedAlert && <Alert variant="success">{savedAlert}</Alert>}
-
-                <Formik
-                  initialValues={initialValues}
-                  validationSchema={validationSchemas[step]}
-                  onSubmit={(values, actions) => {
-                    // submit final: persist local (por ahora)
-                    persistToLocal(values);
-                    actions.setSubmitting(false);
-                  }}
-                >
-                  {({ values, errors, touched, handleChange, handleBlur, setFieldValue, isSubmitting, validateForm }) => (
-                    <FormikForm>
-                      {/* STEP 0: Información inicial */}
-                      {step === 0 && (
-                        <>
-                          <Row>
-                            <Col md={8}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Dirección</Form.Label>
-                                <InputGroup>
-                                  <Form.Control
-                                    name="address_street"
-                                    placeholder="Calle (ej: Av. Libertad)"
-                                    value={values.address_street}
-                                    onChange={handleChange}
-                                    onBlur={handleBlur}
-                                    isInvalid={!!(touched.address_street && errors.address_street)}
-                                  />
-                                  <Form.Control
-                                    name="address_number"
-                                    placeholder="N° casa"
-                                    value={values.address_number}
-                                    onChange={handleChange}
-                                    onBlur={handleBlur}
-                                  />
-                                </InputGroup>
-                                <Form.Text className="text-muted">Ingrese: calle, número, sector y ciudad.</Form.Text>
-                                <Row className="mt-2">
-                                  <Col md={6}>
-                                    <Form.Control
-                                      name="address_sector"
-                                      placeholder="Sector"
-                                      value={values.address_sector}
-                                      onChange={handleChange}
-                                      onBlur={handleBlur}
-                                    />
-                                  </Col>
-                                  <Col md={6}>
-                                    <Form.Control
-                                      name="address_city"
-                                      placeholder="Ciudad"
-                                      value={values.address_city}
-                                      onChange={handleChange}
-                                      onBlur={handleBlur}
-                                      isInvalid={!!(touched.address_city && errors.address_city)}
-                                    />
-                                  </Col>
-                                </Row>
-                              </Form.Group>
-
-                              <Row>
-                                <Col md={6}>
-                                  <Form.Group className="mb-3">
-                                    <Form.Label>Coordenadas (lat)</Form.Label>
-                                    <Form.Control
-                                      name="latitude"
-                                      placeholder="18.5123"
-                                      value={values.latitude}
-                                      onChange={handleChange}
-                                      onBlur={handleBlur}
-                                    />
-                                  </Form.Group>
-                                </Col>
-                                <Col md={6}>
-                                  <Form.Group className="mb-3">
-                                    <Form.Label>Coordenadas (lng)</Form.Label>
-                                    <Form.Control
-                                      name="longitude"
-                                      placeholder="-69.8229"
-                                      value={values.longitude}
-                                      onChange={handleChange}
-                                      onBlur={handleBlur}
-                                    />
-                                  </Form.Group>
-                                </Col>
-                              </Row>
-                            </Col>
-
-                            <Col md={4}>
-                              <Card className="p-2">
-                                <h6>Propietario</h6>
-                                <Form.Group className="mb-2">
-                                  <Form.Label>Nombre</Form.Label>
-                                  <Form.Control name="owner_name" value={values.owner_name} onChange={handleChange} onBlur={handleBlur} isInvalid={!!(touched.owner_name && errors.owner_name)} />
-                                </Form.Group>
-                                <Form.Group className="mb-2">
-                                  <Form.Label>Teléfono</Form.Label>
-                                  <Form.Control name="owner_phone" value={values.owner_phone} onChange={handleChange} onBlur={handleBlur} />
-                                </Form.Group>
-                                <Form.Group className="mb-2">
-                                  <Form.Label>Email</Form.Label>
-                                  <Form.Control name="owner_email" value={values.owner_email} onChange={handleChange} onBlur={handleBlur} />
-                                </Form.Group>
-                                <hr />
-                                <h6>Valuador</h6>
-                                <Form.Group className="mb-2">
-                                  <Form.Label>Nombre</Form.Label>
-                                  <Form.Control name="valuador_name" value={values.valuador_name} onChange={handleChange} onBlur={handleBlur} isInvalid={!!(touched.valuador_name && errors.valuador_name)} />
-                                </Form.Group>
-                                <Form.Group className="mb-2">
-                                  <Form.Label>ID</Form.Label>
-                                  <Form.Control name="valuador_id" value={values.valuador_id} onChange={handleChange} onBlur={handleBlur} />
-                                </Form.Group>
-                              </Card>
-                            </Col>
-                          </Row>
-
-                          <Row>
-                            <Col md={6}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Nombre del solicitante</Form.Label>
-                                <Form.Control name="applicant_name" value={values.applicant_name} onChange={handleChange} onBlur={handleBlur} />
-                              </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Propósito del avalúo</Form.Label>
-                                <Form.Select name="purpose" value={values.purpose} onChange={handleChange} onBlur={handleBlur} isInvalid={!!(touched.purpose && errors.purpose)}>
-                                  <option value="">Seleccione...</option>
-                                  <option value="mercado">Valor de mercado</option>
-                                  <option value="garantia">Garantía hipotecaria</option>
-                                  <option value="tributario">Propósitos tributarios</option>
-                                  <option value="otro">Otro</option>
-                                </Form.Select>
-                              </Form.Group>
-                            </Col>
-                          </Row>
-                        </>
-                      )}
-
-                      {/* STEP 1: Vecindad */}
-                      {step === 1 && (
-                        <>
-                          <Row>
-                            <Col md={6}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Tipo de vecindad</Form.Label>
-                                <Form.Select name="neighborhood_type" value={values.neighborhood_type} onChange={handleChange} onBlur={handleBlur} isInvalid={!!(touched.neighborhood_type && errors.neighborhood_type)}>
-                                  <option value="">Seleccione...</option>
-                                  <option value="urbana">Urbana</option>
-                                  <option value="rural">Rural</option>
-                                  <option value="mixta">Mixta</option>
-                                </Form.Select>
-                              </Form.Group>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Tendencias / Distancias</Form.Label>
-                                <Form.Control as="textarea" rows={3} name="distances" value={values.distances} onChange={handleChange} onBlur={handleBlur} />
-                              </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Resumen / factores desfavorables</Form.Label>
-                                <Form.Control as="textarea" rows={6} name="neighborhood_summary" value={values.neighborhood_summary} onChange={handleChange} onBlur={handleBlur} />
-                              </Form.Group>
-                            </Col>
-                          </Row>
-                        </>
-                      )}
-
-                      {/* STEP 2: Zona */}
-                      {step === 2 && (
-                        <>
-                          <Row>
-                            <Col md={6}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Servicios disponibles</Form.Label>
-                                <div className="d-flex flex-wrap gap-2">
-                                  <Form.Check inline label="Agua" name="services.water" checked={values.services.water} onChange={() => setFieldValue("services", { ...values.services, water: !values.services.water })} />
-                                  <Form.Check inline label="Alcantarillado" name="services.sewer" checked={values.services.sewer} onChange={() => setFieldValue("services", { ...values.services, sewer: !values.services.sewer })} />
-                                  <Form.Check inline label="Electricidad" name="services.electricity" checked={values.services.electricity} onChange={() => setFieldValue("services", { ...values.services, electricity: !values.services.electricity })} />
-                                  <Form.Check inline label="Gas" name="services.gas" checked={values.services.gas} onChange={() => setFieldValue("services", { ...values.services, gas: !values.services.gas })} />
-                                  <Form.Check inline label="Cable" name="services.cable" checked={values.services.cable} onChange={() => setFieldValue("services", { ...values.services, cable: !values.services.cable })} />
-                                </div>
-                              </Form.Group>
-
-                              <Form.Group className="mb-3">
-                                <Form.Label>Topografía</Form.Label>
-                                <Form.Control name="topography" value={values.topography} onChange={handleChange} onBlur={handleBlur} />
-                              </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Zonificación</Form.Label>
-                                <Form.Control name="zoning" value={values.zoning} onChange={handleChange} onBlur={handleBlur} />
-                              </Form.Group>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Área (m²)</Form.Label>
-                                <Form.Control type="number" name="area_m2" value={values.area_m2 as any} onChange={handleChange} onBlur={handleBlur} isInvalid={!!(touched.area_m2 && errors.area_m2)} />
-                              </Form.Group>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Comentarios Zona</Form.Label>
-                                <Form.Control as="textarea" rows={3} name="zone_comments" value={values.zone_comments} onChange={handleChange} onBlur={handleBlur} />
-                              </Form.Group>
-                            </Col>
-                          </Row>
-                        </>
-                      )}
-
-                      {/* STEP 3: Mejoras & Interior */}
-                      {step === 3 && (
-                        <Row>
-                          <Col md={6}>
-                            <Form.Group className="mb-3">
-                              <Form.Label>Año de construcción</Form.Label>
-                              <Form.Control type="number" name="year_built" value={values.year_built as any} onChange={handleChange} onBlur={handleBlur} />
-                            </Form.Group>
-                            <Form.Group className="mb-3">
-                              <Form.Label>Estado general</Form.Label>
-                              <Form.Select name="general_condition" value={values.general_condition} onChange={handleChange} onBlur={handleBlur} isInvalid={!!(touched.general_condition && errors.general_condition)}>
-                                <option value="">Seleccione...</option>
-                                <option value="excelente">Excelente</option>
-                                <option value="bueno">Bueno</option>
-                                <option value="regular">Regular</option>
-                                <option value="malo">Malo</option>
-                              </Form.Select>
-                            </Form.Group>
-                          </Col>
-                          <Col md={6}>
-                            <Form.Group className="mb-3">
-                              <Form.Label>Materiales</Form.Label>
-                              <Form.Control name="materials" value={values.materials} onChange={handleChange} onBlur={handleBlur} />
-                            </Form.Group>
-                            <Form.Group className="mb-3">
-                              <Form.Label>Descripción interior</Form.Label>
-                              <Form.Control as="textarea" rows={4} name="interior_description" value={values.interior_description} onChange={handleChange} onBlur={handleBlur} />
-                            </Form.Group>
-                          </Col>
-                        </Row>
-                      )}
-
-                      {/* STEP 4: Distribución de habitaciones */}
-                      {step === 4 && (
-                        <>
-                          <Row>
-                            <Col md={4}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Dormitorios</Form.Label>
-                                <Form.Control type="number" name="bedrooms" value={values.bedrooms as any} onChange={handleChange} onBlur={handleBlur} />
-                              </Form.Group>
-                            </Col>
-                            <Col md={4}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Baños</Form.Label>
-                                <Form.Control type="number" name="bathrooms" value={values.bathrooms as any} onChange={handleChange} onBlur={handleBlur} />
-                              </Form.Group>
-                            </Col>
-                            <Col md={4}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Parqueos</Form.Label>
-                                <Form.Control type="number" name="parking" value={values.parking as any} onChange={handleChange} onBlur={handleBlur} />
-                              </Form.Group>
-                            </Col>
-                          </Row>
-
-                          <FieldArray name="rooms">
-                            {({ push, remove }) => (
-                              <>
-                                <h6>Lista de habitaciones (opcional)</h6>
-                                {values.rooms && values.rooms.length > 0 ? (
-                                  values.rooms.map((room, idx) => (
-                                    <Row key={idx} className="align-items-end">
-                                      <Col md={6}>
-                                        <Form.Group className="mb-2">
-                                          <Form.Label>Nombre habitación</Form.Label>
-                                          <Form.Control name={`rooms[${idx}].name`} value={room.name} onChange={handleChange} />
-                                        </Form.Group>
-                                      </Col>
-                                      <Col md={4}>
-                                        <Form.Group className="mb-2">
-                                          <Form.Label>Área (m2)</Form.Label>
-                                          <Form.Control type="number" name={`rooms[${idx}].area`} value={room.area as any} onChange={handleChange} />
-                                        </Form.Group>
-                                      </Col>
-                                      <Col md={2}>
-                                        <Button variant="danger" onClick={() => remove(idx)}>Eliminar</Button>
-                                      </Col>
-                                    </Row>
-                                  ))
-                                ) : (
-                                  <div className="mb-2 text-muted">No hay habitaciones añadidas</div>
-                                )}
-                                <Button onClick={() => push({ name: "", area: "" })} className="mt-2">Agregar habitación</Button>
-                              </>
-                            )}
-                          </FieldArray>
-                        </>
-                      )}
-
-                      {/* STEP 5: Metodología / Comparables & Fotos */}
-                      {step === 5 && (
-                        <>
-                          <FieldArray name="comparables">
-                            {({ push, remove }) => (
-                              <>
-                                <h6>Comparables</h6>
-                                {values.comparables && values.comparables.length > 0 && values.comparables.map((c, i) => (
-                                  <Card className="mb-2 p-2" key={i}>
-                                    <Row>
-                                      <Col md={6}>
-                                        <Form.Group className="mb-2">
-                                          <Form.Label>Dirección</Form.Label>
-                                          <Form.Control name={`comparables[${i}].address`} value={c.address} onChange={handleChange} />
-                                        </Form.Group>
-                                      </Col>
-                                      <Col md={3}>
-                                        <Form.Group className="mb-2">
-                                          <Form.Label>Fecha venta</Form.Label>
-                                          <Form.Control type="date" name={`comparables[${i}].saleDate`} value={c.saleDate} onChange={handleChange} />
-                                        </Form.Group>
-                                      </Col>
-                                      <Col md={3}>
-                                        <Form.Group className="mb-2">
-                                          <Form.Label>Precio</Form.Label>
-                                          <Form.Control type="number" name={`comparables[${i}].price`} value={c.price as any} onChange={handleChange} />
-                                        </Form.Group>
-                                      </Col>
-                                    </Row>
-                                    <Row>
-                                      <Col md={3}>
-                                        <Form.Group className="mb-2">
-                                          <Form.Label>m²</Form.Label>
-                                          <Form.Control type="number" name={`comparables[${i}].m2`} value={c.m2 as any} onChange={handleChange} />
-                                        </Form.Group>
-                                      </Col>
-                                      <Col md={9}>
-                                        <Form.Group className="mb-2">
-                                          <Form.Label>Ajustes</Form.Label>
-                                          <Form.Control name={`comparables[${i}].adjustments`} value={c.adjustments} onChange={handleChange} />
-                                        </Form.Group>
-                                      </Col>
-                                    </Row>
-                                    <div>
-                                      <Button variant="danger" onClick={() => remove(i)}>Eliminar</Button>
-                                    </div>
-                                  </Card>
-                                ))}
-                                <Button onClick={() => push({ address: "", saleDate: "", price: "", m2: "", adjustments: "" })}>Agregar comparable</Button>
-                              </>
-                            )}
-                          </FieldArray>
-
-                          <hr />
-                          <Form.Group className="mb-3">
-                            <Form.Label>Fotos (máx {MAX_PHOTOS})</Form.Label>
-                            <Form.Control
-                              type="file"
-                              accept="image/*"
-                              multiple
-                              onChange={async (e: React.ChangeEvent<HTMLInputElement>) => {
-                                const files = e.currentTarget.files;
-                                if (!files) return;
-                                const arr = Array.from(files);
-                                if (arr.length + values.photos.length > MAX_PHOTOS) {
-                                  alert(`Máximo ${MAX_PHOTOS} fotos en total.`);
-                                  return;
-                                }
-                                const b64 = await filesToBase64(files);
-                                setFieldValue("photos", [...values.photos, ...b64]);
-                              }}
-                            />
-                            <Form.Text className="text-muted">Se guardarán como base64 (demo)</Form.Text>
-
-                            <div className="photo-previews mt-2 d-flex flex-wrap gap-2">
-                              {values.photos && values.photos.map((p, i) => (
-                                <div key={i} className="preview">
-                                  <img src={p} alt={`img-${i}`} />
-                                  <Button size="sm" variant="danger" onClick={() => {
-                                    const newPhotos = values.photos.filter((_, idx) => idx !== i);
-                                    setFieldValue("photos", newPhotos);
-                                  }}>Eliminar</Button>
-                                </div>
-                              ))}
-                            </div>
-                          </Form.Group>
-                        </>
-                      )}
-
-                      {/* STEP 6: Conclusiones / Valor */}
-                      {step === 6 && (
-                        <>
-                          <Row>
-                            <Col md={6}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Valor estimado (RD$)</Form.Label>
-                                <Form.Control type="number" name="market_value" value={values.market_value as any} onChange={handleChange} onBlur={handleBlur} isInvalid={!!(touched.market_value && errors.market_value)} />
-                              </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Valor liquidación (RD$)</Form.Label>
-                                <Form.Control type="number" name="liquidation_value" value={values.liquidation_value as any} onChange={handleChange} onBlur={handleBlur} isInvalid={!!(touched.liquidation_value && errors.liquidation_value)} />
-                              </Form.Group>
-                            </Col>
-                          </Row>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Conclusiones</Form.Label>
-                            <Form.Control as="textarea" rows={6} name="conclusions" value={values.conclusions} onChange={handleChange} onBlur={handleBlur} />
-                          </Form.Group>
-                        </>
-                      )}
-
-                      {/* Botones del wizard */}
-                      <div className="d-flex justify-content-between mt-3">
-                        <div>
-                          {step > 0 && <Button variant="secondary" onClick={() => setStep(step - 1)}>Atrás</Button>}
-                        </div>
-
-                        <div>
-                          {step < validationSchemas.length - 1 && (
-                            <Button
-                              variant="primary"
-                              onClick={async () => {
-                                // validar campos del paso actual
-                                const err = await validateForm();
-                                // if errors object contains keys of current step fields, block
-                                // we'll rely on Yup via validationSchema prop: Formik runs it, but we'll check errors:
-                                const keysForThisStep = Object.keys(validationSchemas[step].fields || {});
-                                const stepHasErrors = keysForThisStep.some(k => (err as any)[k]);
-                                if (stepHasErrors) {
-                                  // show alert or let Formik show invalid fields
-                                  window.scrollTo({ top: 0, behavior: "smooth" });
-                                  return;
-                                }
-                                setStep(step + 1);
-                              }}
-                            >
-                              Siguiente
-                            </Button>
-                          )}
-
-                          {step === validationSchemas.length - 1 && (
-                            <Button variant="success" type="submit" disabled={isSubmitting}>
-                              Guardar & Finalizar
-                            </Button>
-                          )}
-                        </div>
+          <Form onSubmit={(e) => { e.preventDefault(); formik.handleSubmit(); }}>
+            {/* STEP 1: Información inicial */}
+            {step === 1 && (
+              <>
+                <Row>
+                  <Col md={8}>
+                    <Form.Group className="mb-2">
+                      <Form.Label>Dirección</Form.Label>
+                      <InputGroup>
+                        <Form.Control placeholder="Calle" value={formik.values.calle}
+                          onChange={(e) => formik.setFieldValue("calle", e.target.value)} />
+                        <Form.Control placeholder="Número" value={formik.values.numero}
+                          onChange={(e) => formik.setFieldValue("numero", e.target.value)} />
+                      </InputGroup>
+                      <div className="mt-2">
+                        <InputGroup>
+                          <Form.Control placeholder="Sector" value={formik.values.sector}
+                            onChange={(e) => formik.setFieldValue("sector", e.target.value)} />
+                          <Form.Control placeholder="Ciudad" value={formik.values.ciudad}
+                            onChange={(e) => formik.setFieldValue("ciudad", e.target.value)} />
+                        </InputGroup>
                       </div>
-                    </FormikForm>
-                  )}
-                </Formik>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
+                    </Form.Group>
+
+                    <Form.Group className="mb-2">
+                      <Form.Label>Coordenadas (Lat, Lng)</Form.Label>
+                      <InputGroup>
+                        <Form.Control placeholder="Latitud" value={formik.values.lat}
+                          onChange={(e) => formik.setFieldValue("lat", e.target.value)} />
+                        <Form.Control placeholder="Longitud" value={formik.values.lng}
+                          onChange={(e) => formik.setFieldValue("lng", e.target.value)} />
+                      </InputGroup>
+                      <Form.Text className="text-muted">Puedes indicar las coordenadas o usar el selector (demo).</Form.Text>
+                      <Form.Group className="mt-2">
+                        <Form.Label>Comentario sobre coordenadas</Form.Label>
+                        <Form.Control as="textarea" rows={2} value={formik.values.coordenadasComentario}
+                          onChange={(e) => formik.setFieldValue("coordenadasComentario", e.target.value)} />
+                      </Form.Group>
+                    </Form.Group>
+                  </Col>
+
+                  <Col md={4}>
+                    <Form.Group className="mb-2">
+                      <Form.Label>Propietario</Form.Label>
+                      <Form.Control placeholder="Nombre" value={formik.values.propietarioNombre}
+                        onChange={(e) => formik.setFieldValue("propietarioNombre", e.target.value)} />
+                      <Form.Control placeholder="Teléfono" className="mt-2" value={formik.values.propietarioTelefono}
+                        onChange={(e) => formik.setFieldValue("propietarioTelefono", e.target.value)} />
+                      <Form.Control placeholder="Email" className="mt-2" value={formik.values.propietarioEmail}
+                        onChange={(e) => formik.setFieldValue("propietarioEmail", e.target.value)} />
+                    </Form.Group>
+
+                    <Form.Group className="mb-2">
+                      <Form.Label>Valuador</Form.Label>
+                      <Form.Control placeholder="Nombre" value={formik.values.valuadorNombre}
+                        onChange={(e) => formik.setFieldValue("valuadorNombre", e.target.value)} />
+                      <Form.Control placeholder="Identificación" className="mt-2" value={formik.values.valuadorIdentificacion}
+                        onChange={(e) => formik.setFieldValue("valuadorIdentificacion", e.target.value)} />
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </>
+            )}
+
+            {/* STEP 2: Vecindad */}
+            {step === 2 && (
+              <>
+                <h5>Descripción de la Vecindad</h5>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-2">
+                      <Form.Label>Tipo de Vecindad</Form.Label>
+                      <Form.Select value={formik.values.tipoVecindad} onChange={(e) => formik.setFieldValue("tipoVecindad", e.target.value)}>
+                        <option value="">Seleccione</option>
+                        <option value="Urbano">Urbano</option>
+                        <option value="Rural">Rural</option>
+                        <option value="Mixto">Mixto</option>
+                      </Form.Select>
+                    </Form.Group>
+
+                    <Form.Group className="mb-2">
+                      <Form.Label>Tendencia de la Vecindad</Form.Label>
+                      <Form.Select value={formik.values.tendenciaVecindad} onChange={(e) => formik.setFieldValue("tendenciaVecindad", e.target.value)}>
+                        <option value="">Seleccione</option>
+                        <option value="A mejorar">A mejorar</option>
+                        <option value="Estable">Estable</option>
+                        <option value="A empeorar">A empeorar</option>
+                        <option value="En transición">En transición</option>
+                      </Form.Select>
+                    </Form.Group>
+
+                    <Form.Group className="mb-2">
+                      <Form.Label>Comparación con las propiedades del vecindario</Form.Label>
+                      <Form.Select value={formik.values.comparacionVecindario} onChange={(e) => formik.setFieldValue("comparacionVecindario", e.target.value)}>
+                        <option value="">Seleccione</option>
+                        <option value="Inferior">Inferior</option>
+                        <option value="Similar">Similar</option>
+                        <option value="Superior">Superior</option>
+                      </Form.Select>
+                    </Form.Group>
+
+                    <Form.Group className="mb-2">
+                      <Form.Label>Antigüedad promedio (años)</Form.Label>
+                      <Form.Control type="number" value={formik.values.antiguedadPromedio as any} onChange={(e) => formik.setFieldValue("antiguedadPromedio", e.target.value)} />
+                    </Form.Group>
+
+                    <Form.Group className="mb-2">
+                      <Form.Label>Oferta</Form.Label>
+                      <Form.Select value={formik.values.oferta} onChange={(e) => formik.setFieldValue("oferta", e.target.value)}>
+                        <option value="">Seleccione</option>
+                        <option value="Mucha">Mucha</option>
+                        <option value="Razonable">Razonable</option>
+                        <option value="Poca">Poca</option>
+                      </Form.Select>
+                    </Form.Group>
+
+                    <Form.Group className="mb-2">
+                      <Form.Label>Demanda</Form.Label>
+                      <Form.Select value={formik.values.demanda} onChange={(e) => formik.setFieldValue("demanda", e.target.value)}>
+                        <option value="">Seleccione</option>
+                        <option value="Mucha">Mucha</option>
+                        <option value="Razonable">Razonable</option>
+                        <option value="Poca">Poca</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+
+                  <Col md={6}>
+                    <Form.Group className="mb-2">
+                      <Form.Label>Distancias a:</Form.Label>
+                      <Row>
+                        <Col md={6}><Form.Label>Escuela primaria</Form.Label><Form.Control value={formik.values.distanciaEscuelaPrimaria} onChange={(e)=>formik.setFieldValue("distanciaEscuelaPrimaria", e.target.value)} /></Col>
+                        <Col md={6}><Form.Label>Escuela secundaria</Form.Label><Form.Control value={formik.values.distanciaEscuelaSecundaria} onChange={(e)=>formik.setFieldValue("distanciaEscuelaSecundaria", e.target.value)} /></Col>
+                        <Col md={6}><Form.Label>Transporte público</Form.Label><Form.Control value={formik.values.distanciaTransporte} onChange={(e)=>formik.setFieldValue("distanciaTransporte", e.target.value)} /></Col>
+                        <Col md={6}><Form.Label>Comercios</Form.Label><Form.Control value={formik.values.distanciaComercios} onChange={(e)=>formik.setFieldValue("distanciaComercios", e.target.value)} /></Col>
+                        <Col md={12}><Form.Label>Centro de la ciudad</Form.Label><Form.Control value={formik.values.distanciaCentroCiudad} onChange={(e)=>formik.setFieldValue("distanciaCentroCiudad", e.target.value)} /></Col>
+                      </Row>
+                    </Form.Group>
+
+                    <Form.Group className="mb-2">
+                      <Form.Label>Deseabilidad de la propiedad</Form.Label>
+                      <Form.Select value={formik.values.deseabilidad} onChange={(e)=>formik.setFieldValue("deseabilidad", e.target.value)}>
+                        <option value="">Seleccione</option>
+                        <option value="Alta">Alta</option>
+                        <option value="Promedio">Promedio</option>
+                        <option value="Baja">Baja</option>
+                      </Form.Select>
+                    </Form.Group>
+
+                    <Form.Group className="mb-2">
+                      <Form.Label>Resumen / Factores desfavorables</Form.Label>
+                      <Form.Control as="textarea" rows={4} value={formik.values.resumenFactores} onChange={(e)=>formik.setFieldValue("resumenFactores", e.target.value)} />
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </>
+            )}
+
+            {/* STEP 3: Zona (resumido) */}
+            {step === 3 && (
+              <>
+                <h5>Descripción de la Zona</h5>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-2"><Form.Label>Limites naturales</Form.Label><Form.Control value={formik.values.limitesNaturales} onChange={(e)=>formik.setFieldValue("limitesNaturales", e.target.value)} /></Form.Group>
+                    <Form.Group className="mb-2"><Form.Label>Área (m²)</Form.Label><Form.Control type="number" value={formik.values.areaM2 as any} onChange={(e)=>formik.setFieldValue("areaM2", e.target.value)} /></Form.Group>
+                    <Form.Group className="mb-2"><Form.Label>Tipo de terreno</Form.Label><Form.Control value={formik.values.tipoTerreno} onChange={(e)=>formik.setFieldValue("tipoTerreno", e.target.value)} /></Form.Group>
+                    <Form.Group className="mb-2"><Form.Label>Uso de suelo</Form.Label><Form.Control value={formik.values.usoSuelo} onChange={(e)=>formik.setFieldValue("usoSuelo", e.target.value)} /></Form.Group>
+                    <Form.Group className="mb-2"><Form.Label>Configuración</Form.Label><Form.Control value={formik.values.configuracion} onChange={(e)=>formik.setFieldValue("configuracion", e.target.value)} /></Form.Group>
+                    <Form.Group className="mb-2"><Form.Label>Zonificación</Form.Label><Form.Control value={formik.values.zonificacion} onChange={(e)=>formik.setFieldValue("zonificacion", e.target.value)} /></Form.Group>
+                  </Col>
+
+                  <Col md={6}>
+                    <h6>Posee</h6>
+                    {["Calle pavimentada","Calle sin pavimentar","Acera","Contenes","Alumbrado electrico","Televisión por cable"].map((opt)=>(
+                      <Form.Check key={opt} type="checkbox" label={opt} checked={formik.values.posee.includes(opt)} onChange={(e)=>{
+                        const copy = [...formik.values.posee];
+                        if(e.target.checked) copy.push(opt); else { const idx = copy.indexOf(opt); if(idx>=0) copy.splice(idx,1); }
+                        formik.setFieldValue("posee", copy);
+                      }} />
+                    ))}
+
+                    <h6 className="mt-3">Servicios disponibles</h6>
+                    {["Teléfono","Gas","Agua potable","Pozo privado","Pozo público","Alcantarillado sanitario","Pozo séptico","Alcantarilla pluvial","Drenajes por zanjas abiertas"].map((opt)=>(
+                      <Form.Check key={opt} type="checkbox" label={opt} checked={formik.values.servicios.includes(opt)} onChange={(e)=>{
+                        const copy = [...formik.values.servicios];
+                        if(e.target.checked) copy.push(opt); else { const idx = copy.indexOf(opt); if(idx>=0) copy.splice(idx,1); }
+                        formik.setFieldValue("servicios", copy);
+                      }} />
+                    ))}
+
+                    <Form.Group className="mt-3">
+                      <Form.Label>El uso actual de la propiedad está conforme con lo permitido</Form.Label>
+                      <Form.Select value={formik.values.usoConforme} onChange={(e)=>formik.setFieldValue("usoConforme", e.target.value)}>
+                        <option value="Si">Si</option>
+                        <option value="No">No (Ver comentarios)</option>
+                      </Form.Select>
+                    </Form.Group>
+
+                    <Form.Group className="mt-3"><Form.Label>Paisajismo / áreas verdes</Form.Label>
+                      <Form.Select value={formik.values.paisajismo} onChange={(e)=>formik.setFieldValue("paisajismo", e.target.value)}>
+                        <option value="">Seleccione</option>
+                        {["Excelente","Muy buena","Buena","Regular","Mala","Inexistente"].map(opt=><option key={opt} value={opt}>{opt}</option>)}
+                      </Form.Select>
+                    </Form.Group>
+                    <Form.Group className="mt-2"><Form.Label>Servidumbre</Form.Label>
+                      <Form.Select value={formik.values.servidumbre} onChange={(e)=>formik.setFieldValue("servidumbre", e.target.value)}>
+                        <option value="">Seleccione</option>
+                        <option value="Servicios públicos">Servicios públicos</option>
+                        <option value="De paso">De paso</option>
+                      </Form.Select>
+                    </Form.Group>
+                    <Form.Group className="mt-2"><Form.Label>Entrada y salida de la propiedad</Form.Label>
+                      {["Privada","Común","Ninguna","Única","Doble","Múltiple","Adecuada","Pavimentada"].map((opt)=>(
+                        <Form.Check key={opt} inline type="checkbox" label={opt} checked={formik.values.entradaSalida.includes(opt)} onChange={(e)=>{
+                          const copy=[...formik.values.entradaSalida]; if(e.target.checked) copy.push(opt); else { const i=copy.indexOf(opt); if(i>=0) copy.splice(i,1);}
+                          formik.setFieldValue("entradaSalida", copy);
+                        }} />
+                      ))}
+                    </Form.Group>
+                    <Form.Group className="mt-2"><Form.Label>Instalación eléctrica</Form.Label>
+                      <Form.Select value={formik.values.instalacionElectrica} onChange={(e)=>formik.setFieldValue("instalacionElectrica", e.target.value)}>
+                        <option value="">Seleccione</option>
+                        <option value="Subterránea">Subterránea</option>
+                        <option value="En postes">En postes</option>
+                        <option value="Nula">Nula</option>
+                      </Form.Select>
+                    </Form.Group>
+
+                    <Form.Group className="mt-3"><Form.Label>Comentarios</Form.Label>
+                      <Form.Control as="textarea" rows={3} value={formik.values.zonaComentarios} onChange={(e)=>formik.setFieldValue("zonaComentarios", e.target.value)} />
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </>
+            )}
+
+            {/* STEP 4: Mejoras */}
+            {step === 4 && (
+              <>
+                <h5>Descripción de las Mejoras</h5>
+                <Row>
+                  <Col md={8}>
+                    <Form.Group className="mb-2"><Form.Label>Año de construcción</Form.Label><Form.Control type="number" value={formik.values.anioConstruccion as any} onChange={(e)=>formik.setFieldValue("anioConstruccion", e.target.value)} /></Form.Group>
+
+                    <Form.Group className="mb-2"><Form.Check type="checkbox" label="Construcción terminada" checked={formik.values.construccionTerminada} onChange={(e)=>formik.setFieldValue("construccionTerminada", e.target.checked)} /></Form.Group>
+
+                    <Form.Group className="mb-2">
+                      <Form.Label>Pisos (agregar más si necesita)</Form.Label>
+                      <div>
+                        {Array.from({length: formik.values.pisos.pisosCount}).map((_, idx)=>(
+                          <InputGroup className="mb-2" key={idx}>
+                            <InputGroup.Text>Piso {idx+1}</InputGroup.Text>
+                            <Form.Control type="number" placeholder="Area m2" value={formik.values.pisos.areas[idx] || 0} onChange={(e)=>{
+                              const arr = [...formik.values.pisos.areas];
+                              arr[idx] = Number(e.target.value) || 0;
+                              formik.setFieldValue("pisos", {...formik.values.pisos, areas: arr});
+                            }} />
+                          </InputGroup>
+                        ))}
+                        <div className="d-flex gap-2">
+                          <Button size="sm" onClick={()=>{
+                            const newCount = formik.values.pisos.pisosCount + 1;
+                            const arr = [...formik.values.pisos.areas, 0];
+                            formik.setFieldValue("pisos", { pisosCount: newCount, areas: arr });
+                          }}>Agregar piso</Button>
+                          <Button size="sm" variant="secondary" onClick={()=>{
+                            if(formik.values.pisos.pisosCount>1){
+                              const newCount = formik.values.pisos.pisosCount - 1;
+                              const arr = [...formik.values.pisos.areas]; arr.pop();
+                              formik.setFieldValue("pisos", { pisosCount: newCount, areas: arr });
+                            }
+                          }}>Quitar piso</Button>
+                        </div>
+                        <div className="mt-2">Total m²: {formik.values.pisos.areas.reduce((a,b)=>a+(Number(b)||0),0)}</div>
+                      </div>
+                    </Form.Group>
+
+                    <Form.Group className="mb-2"><Form.Label>Edad efectiva (años)</Form.Label><Form.Control type="number" value={formik.values.edadEfectiva as any} onChange={(e)=>formik.setFieldValue("edadEfectiva", e.target.value)} /></Form.Group>
+                    <Form.Group className="mb-2"><Form.Label>Antigüedad aproximada (años)</Form.Label><Form.Control type="number" value={formik.values.antiguedadAprox as any} onChange={(e)=>formik.setFieldValue("antiguedadAprox", e.target.value)} /></Form.Group>
+                    <Form.Group className="mb-2"><Form.Label>% Terminación</Form.Label><Form.Control type="number" value={formik.values.porcentajeTerminacion as any} onChange={(e)=>formik.setFieldValue("porcentajeTerminacion", e.target.value)} /></Form.Group>
+                    <Form.Group className="mb-2"><Form.Label>Vida estimada (años)</Form.Label><Form.Control type="number" value={formik.values.vidaEstimadAnios as any} onChange={(e)=>formik.setFieldValue("vidaEstimadAnios", e.target.value)} /></Form.Group>
+                  </Col>
+
+                  <Col md={4}>
+                    <Form.Group className="mb-2"><Form.Label>Sótano</Form.Label>
+                      <Form.Select value={formik.values.sotano} onChange={(e)=>formik.setFieldValue("sotano", e.target.value)}>
+                        <option value="No posee">No posee</option>
+                        <option value="Completo">Completo</option>
+                        <option value="Parcial">Parcial</option>
+                      </Form.Select>
+                      {formik.values.sotano !== "No posee" && <Form.Control className="mt-2" placeholder="Area m2" type="number" value={formik.values.sotanoArea as any} onChange={(e)=>formik.setFieldValue("sotanoArea", e.target.value)} />}
+                    </Form.Group>
+
+                    <Form.Group className="mb-2"><Form.Label>Tipo de Inmueble</Form.Label>
+                      {["Asilado","En hileras","Townhouse","Apartamento","Duplex","Triplex","Condominio"].map(opt=>(
+                        <Form.Check key={opt} type="checkbox" label={opt} checked={formik.values.tipoInmueble.includes(opt)} onChange={(e)=>{
+                          const copy=[...formik.values.tipoInmueble]; if(e.target.checked) copy.push(opt); else { const i=copy.indexOf(opt); if(i>=0) copy.splice(i,1);} formik.setFieldValue("tipoInmueble", copy);
+                        }} />
+                      ))}
+                    </Form.Group>
+
+                    <Form.Group className="mb-2"><Form.Label>Estructura</Form.Label><Form.Control value={formik.values.estructura} onChange={(e)=>formik.setFieldValue("estructura", e.target.value)} /></Form.Group>
+
+                    <Form.Group className="mb-2"><Form.Label>Materiales de construcción</Form.Label>
+                      {["Madera","Acero","Bloques de H.A.","Bloques de hormigón armado"].map(opt=>(
+                        <Form.Check key={opt} type="checkbox" label={opt} checked={formik.values.materialesConstruccion.includes(opt)} onChange={(e)=>{
+                          const copy=[...formik.values.materialesConstruccion]; if(e.target.checked) copy.push(opt); else { const i=copy.indexOf(opt); if(i>=0) copy.splice(i,1);} formik.setFieldValue("materialesConstruccion", copy);
+                        }} />
+                      ))}
+                    </Form.Group>
+
+                    <Form.Group className="mb-2"><Form.Label>Tipos de marcos de ventanas</Form.Label><Form.Control value={formik.values.marcosVentanas} onChange={(e)=>formik.setFieldValue("marcosVentanas", e.target.value)} /></Form.Group>
+
+                    <Form.Group className="mb-2"><Form.Label>Revestimiento exterior</Form.Label>
+                      {["Pañete cemento","Ladrillo macizo","Piedra / laja","Coralina","Pintura","Aluminio","Vinilo","Ladrillo aislante","Otros"].map(opt=>(
+                        <Form.Check key={opt} type="checkbox" label={opt} checked={formik.values.revestimientoExterior.includes(opt)} onChange={(e)=>{
+                          const copy=[...formik.values.revestimientoExterior]; if(e.target.checked) copy.push(opt); else { const i=copy.indexOf(opt); if(i>=0) copy.splice(i,1);} formik.setFieldValue("revestimientoExterior", copy);
+                        }} />
+                      ))}
+                    </Form.Group>
+
+                    <Form.Group className="mb-2"><Form.Label>Material de techo</Form.Label>
+                      {["Teja asfáltica","Teja de barro","Cubierta metálica","Losa de H.A.","Shingles de cedro"].map(opt=>(
+                        <Form.Check key={opt} type="checkbox" label={opt} checked={formik.values.materialTecho.includes(opt)} onChange={(e)=>{
+                          const copy=[...formik.values.materialTecho]; if(e.target.checked) copy.push(opt); else { const i=copy.indexOf(opt); if(i>=0) copy.splice(i,1);} formik.setFieldValue("materialTecho", copy);
+                        }} />
+                      ))}
+                    </Form.Group>
+
+                    <Form.Group className="mb-2"><Form.Label>Condición general externa</Form.Label>
+                      <Form.Select value={formik.values.condicionGeneralExterna} onChange={(e)=>formik.setFieldValue("condicionGeneralExterna", e.target.value)}>
+                        <option value="">Seleccione</option>
+                        {["Muy buena","Buena","Regular","Mala"].map(o=><option key={o} value={o}>{o}</option>)}
+                      </Form.Select>
+                    </Form.Group>
+
+                    <Form.Group className="mb-2"><Form.Label>Comentarios</Form.Label><Form.Control as="textarea" rows={3} value={formik.values.mejorasComentarios} onChange={(e)=>formik.setFieldValue("mejorasComentarios", e.target.value)} /></Form.Group>
+                  </Col>
+                </Row>
+              </>
+            )}
+
+            {/* STEP 5: Interior */}
+            {step === 5 && (
+              <>
+                <h5>Descripción del Interior</h5>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group><Form.Label>Pisos (materiales)</Form.Label>
+                      {["Granito","Porcelanato","Mármol","Parquet","Terrazo","Alfombra","Madera","Mosaico","Cerámica","Ladrillo","Laminado de vinilo","Baldosas vinílicas"].map(opt=>(
+                        <Form.Check key={opt} type="checkbox" label={opt} checked={formik.values.pisosMateriales.includes(opt)} onChange={(e)=>{
+                          const copy=[...formik.values.pisosMateriales]; if(e.target.checked) copy.push(opt); else { const i=copy.indexOf(opt); if(i>=0) copy.splice(i,1);} formik.setFieldValue("pisosMateriales", copy);
+                        }} />
+                      ))}
+                    </Form.Group>
+                    <Form.Group className="mt-2"><Form.Label>Distribución arquitectónica</Form.Label>
+                      <Form.Select value={formik.values.distribucionArquitectonica} onChange={(e)=>formik.setFieldValue("distribucionArquitectonica", e.target.value)}>
+                        <option value="">Seleccione</option>
+                        {["Muy buena","Buena","Regular","Mala"].map(o=> <option key={o} value={o}>{o}</option>)}
+                      </Form.Select></Form.Group>
+
+                    <Form.Group className="mt-2"><Form.Label>Armarios</Form.Label>
+                      <Form.Select value={formik.values.armarios} onChange={(e)=>formik.setFieldValue("armarios", e.target.value)}>
+                        <option value="">Seleccione</option>
+                        {["Muy buenos","Buenos","Regulares","Malos"].map(o=> <option key={o} value={o}>{o}</option>)}
+                      </Form.Select></Form.Group>
+
+                    <Form.Group className="mt-2"><Form.Label>Dormitorios (tamaño)</Form.Label>
+                      <Form.Select value={formik.values.dormitoriosTamano} onChange={(e)=>formik.setFieldValue("dormitoriosTamano", e.target.value)}>
+                        <option value="">Seleccione</option>
+                        {["Grandes","Medios","Pequeños"].map(o=> <option key={o} value={o}>{o}</option>)}
+                      </Form.Select></Form.Group>
+
+                    <Form.Group className="mt-2"><Form.Label>Cantidad de baños</Form.Label>
+                      <Form.Select value={formik.values.cantidadBanos} onChange={(e)=>formik.setFieldValue("cantidadBanos", e.target.value)}>
+                        <option value="">Seleccione</option>
+                        <option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5+">5+</option>
+                      </Form.Select></Form.Group>
+
+                    <Form.Group className="mt-2"><Form.Label>Calidad de los baños</Form.Label>
+                      <Form.Select value={formik.values.calidadBanos} onChange={(e)=>formik.setFieldValue("calidadBanos", e.target.value)}>
+                        {["Muy buenos","Buenos","Malos","Fabricados a gusto de clientes"].map(o=> <option key={o} value={o}>{o}</option>)}
+                      </Form.Select></Form.Group>
+
+                    <Form.Group className="mt-2"><Form.Label>Condición general interna</Form.Label>
+                      <Form.Select value={formik.values.condicionGeneralInterna} onChange={(e)=>formik.setFieldValue("condicionGeneralInterna", e.target.value)}>
+                        {["Muy buena","Buena","Regular","Mala"].map(o=> <option key={o} value={o}>{o}</option>)}
+                      </Form.Select></Form.Group>
+                  </Col>
+
+                  <Col md={6}>
+                    <Form.Group className="mb-2"><Form.Label>Paredes materiales</Form.Label><Form.Control value={formik.values.paredesMateriales} onChange={(e)=>formik.setFieldValue("paredesMateriales", e.target.value)} /></Form.Group>
+                    <Form.Group className="mb-2"><Form.Label>Techos materiales</Form.Label><Form.Control value={formik.values.techosMateriales} onChange={(e)=>formik.setFieldValue("techosMateriales", e.target.value)} /></Form.Group>
+                    <Form.Group className="mb-2"><Form.Label>Otros detalles</Form.Label><Form.Control value={formik.values.otrosDetalles} onChange={(e)=>formik.setFieldValue("otrosDetalles", e.target.value)} /></Form.Group>
+
+                    <Form.Group className="mt-3"><Form.Label>Muros de cimientos</Form.Label>
+                      <Form.Select value={formik.values.murosCimientos} onChange={(e)=>formik.setFieldValue("murosCimientos", e.target.value)}>
+                        {["H.A. vaciado","Bloques de H.A.","Losa de H.A.","Ladrillo y piedra"].map(o=> <option key={o} value={o}>{o}</option>)}
+                      </Form.Select></Form.Group>
+
+                    <Form.Group className="mt-2"><Form.Label>Tuberías</Form.Label>
+                      <Form.Select value={formik.values.tuberias} onChange={(e)=>formik.setFieldValue("tuberias", e.target.value)}>
+                        {["Cobre","PVC","Galvanizado"].map(o=> <option key={o} value={o}>{o}</option>)}
+                      </Form.Select></Form.Group>
+
+                    <Form.Group className="mt-2"><Form.Label>Instalación sanitaria</Form.Label>
+                      {["Cisterna","Jacuzzi","Piscina","Tinaco"].map(opt=> <Form.Check key={opt} type="checkbox" label={opt} checked={formik.values.instalacionSanitaria.includes(opt)} onChange={(e)=>{
+                        const copy=[...formik.values.instalacionSanitaria]; if(e.target.checked) copy.push(opt); else{ const i=copy.indexOf(opt); if(i>=0) copy.splice(i,1);} formik.setFieldValue("instalacionSanitaria", copy);
+                      }} />)}
+                    </Form.Group>
+
+                    <Form.Group className="mt-2"><Form.Label>Calentador de agua</Form.Label>
+                      <Form.Select value={formik.values.calentadorAgua} onChange={(e)=>formik.setFieldValue("calentadorAgua", e.target.value)}>
+                        <option value="">Seleccione</option>
+                        <option value="A gas">A gas</option>
+                        <option value="Eléctrico">Eléctrico</option>
+                        <option value="No posee">No posee</option>
+                      </Form.Select></Form.Group>
+
+                    <Form.Group className="mt-2"><Form.Label>Sistema eléctrico</Form.Label>
+                      {["Fusibles","Interruptores"].map(opt=> <Form.Check key={opt} type="checkbox" label={opt} checked={formik.values.sistemaElectrico.includes(opt)} onChange={(e)=>{
+                        const copy=[...formik.values.sistemaElectrico]; if(e.target.checked) copy.push(opt); else{ const i=copy.indexOf(opt); if(i>=0) copy.splice(i,1);} formik.setFieldValue("sistemaElectrico", copy);
+                      }} />)}
+                    </Form.Group>
+
+                    <Form.Group className="mt-2"><Form.Label>Artefactos e instalaciones adicionales</Form.Label>
+                      {["Alarmas de robo","Alarmas de incendios","Barrera de alambre de puas","Eliminador de basura","Chimenea","Sauna","Tratamiento de agua","Tragaluces","Solarium","Puerta de garaje automática","Verja parcial"].map(opt=> <Form.Check key={opt} type="checkbox" label={opt} checked={formik.values.artefactosInstalaciones.includes(opt)} onChange={(e)=>{
+                        const copy=[...formik.values.artefactosInstalaciones]; if(e.target.checked) copy.push(opt); else{ const i=copy.indexOf(opt); if(i>=0) copy.splice(i,1);} formik.setFieldValue("artefactosInstalaciones", copy);
+                      }} />)}
+                    </Form.Group>
+
+                    <Form.Group className="mt-3"><Form.Label>Comentarios</Form.Label><Form.Control as="textarea" rows={3} value={formik.values.interiorComentarios} onChange={(e)=>formik.setFieldValue("interiorComentarios", e.target.value)} /></Form.Group>
+                  </Col>
+                </Row>
+              </>
+            )}
+
+            {/* STEP 6: Distribución habitaciones */}
+            {step === 6 && (
+              <>
+                <h5>Distribución de las Habitaciones</h5>
+                <Row>
+                  <Col md={12}>
+                    <Button size="sm" onClick={addHabitacion}>Agregar habitación</Button>
+                    <div className="mt-2">
+                      {formik.values.habitaciones.map((h, idx)=>(
+                        <InputGroup key={idx} className="mb-2">
+                          <Form.Control placeholder="Piso" value={h.piso} onChange={(e)=>{
+                            const arr = [...formik.values.habitaciones]; arr[idx].piso = e.target.value; formik.setFieldValue("habitaciones", arr);
+                          }} />
+                          <Form.Control placeholder="Nombre" value={h.nombre} onChange={(e)=>{
+                            const arr = [...formik.values.habitaciones]; arr[idx].nombre = e.target.value; formik.setFieldValue("habitaciones", arr);
+                          }} />
+                          <Button variant="danger" onClick={()=>removeHabitacion(idx)}>Eliminar</Button>
+                        </InputGroup>
+                      ))}
+                    </div>
+
+                    <h6 className="mt-3">Fuentes de datos del costo</h6>
+                    {["Manual","Contratista local","Otro"].map(opt=> <Form.Check key={opt} type="checkbox" label={opt} checked={formik.values.fuentesDatosCosto.includes(opt)} onChange={(e)=>{
+                      const copy=[...formik.values.fuentesDatosCosto]; if(e.target.checked) copy.push(opt); else{ const i=copy.indexOf(opt); if(i>=0) copy.splice(i,1);} formik.setFieldValue("fuentesDatosCosto", copy);
+                    }} />)}
+
+                    <h6 className="mt-3">Costo / Reposición</h6>
+                    <Form.Group className="mb-2"><Form.Label>Costo</Form.Label><Form.Control type="number" value={formik.values.costo as any} onChange={(e)=>formik.setFieldValue("costo", e.target.value)} /></Form.Group>
+                    <Form.Group className="mb-2"><Form.Label>Otras edificaciones</Form.Label><Form.Control type="number" value={formik.values.otrasEdificaciones as any} onChange={(e)=>formik.setFieldValue("otrasEdificaciones", e.target.value)} /></Form.Group>
+                    <Form.Group className="mb-2"><Form.Label>Costo total de reposición</Form.Label><Form.Control type="number" value={formik.values.costoReposicionTotal as any} onChange={(e)=>formik.setFieldValue("costoReposicionTotal", e.target.value)} /></Form.Group>
+                  </Col>
+                </Row>
+              </>
+            )}
+
+            {/* STEP 7: Comparables */}
+            {step === 7 && (
+              <>
+                <h5>Enfoque de Ventas Comparables</h5>
+                <div className="mb-2">
+                  <Button size="sm" onClick={addComparable}>Agregar comparable</Button>
+                </div>
+                {formik.values.comparables.map((c, i)=>(
+                  <Card key={i} className="mb-2">
+                    <Card.Body>
+                      <Row>
+                        <Col md={6}><Form.Control placeholder="Dirección" value={c.direccion} onChange={(e)=>{ const arr=[...formik.values.comparables]; arr[i].direccion=e.target.value; formik.setFieldValue("comparables", arr); }} /></Col>
+                        <Col md={2}><Form.Control type="date" value={c.fechaVenta} onChange={(e)=>{ const arr=[...formik.values.comparables]; arr[i].fechaVenta=e.target.value; formik.setFieldValue("comparables", arr); }} /></Col>
+                        <Col md={2}><Form.Control placeholder="Precio" type="number" value={c.precio as any} onChange={(e)=>{ const arr=[...formik.values.comparables]; arr[i].precio=Number(e.target.value)||""; formik.setFieldValue("comparables", arr); }} /></Col>
+                        <Col md={2}><Form.Control placeholder="m2" type="number" value={c.m2 as any} onChange={(e)=>{ const arr=[...formik.values.comparables]; arr[i].m2=Number(e.target.value)||""; formik.setFieldValue("comparables", arr); }} /></Col>
+                      </Row>
+                      <Row className="mt-2">
+                        <Col md={10}><Form.Control placeholder="Ajustes" value={c.ajustes} onChange={(e)=>{ const arr=[...formik.values.comparables]; arr[i].ajustes=e.target.value; formik.setFieldValue("comparables", arr); }} /></Col>
+                        <Col md={2}><Button variant="danger" onClick={()=>removeComparable(i)}>Eliminar</Button></Col>
+                      </Row>
+                    </Card.Body>
+                  </Card>
+                ))}
+                <Form.Group className="mt-2"><Form.Label>Comentarios</Form.Label><Form.Control as="textarea" rows={3} value={formik.values.conclusiones} onChange={(e)=>formik.setFieldValue("conclusiones", e.target.value)} /></Form.Group>
+              </>
+            )}
+
+            {/* STEP 8: Fotos y Conclusiones */}
+            {step === 8 && (
+              <>
+                <h5>Fotos y Conclusiones</h5>
+                <Form.Group className="mb-2">
+                  <Form.Label>Fotos (máx {MAX_PHOTOS})</Form.Label>
+                  <Form.Control type="file" accept="image/*" multiple onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFileChange(e.target.files)} />
+                  <Form.Text className="text-muted">Se guardarán como base64 (demo).</Form.Text>
+                </Form.Group>
+
+                <Row className="mb-2">
+                  {formik.values.fotos.map((b64, i)=>(
+                    <Col key={i} xs={6} md={3} className="mb-2">
+                      <img src={b64} alt={`foto-${i}`} className="img-fluid rounded" />
+                    </Col>
+                  ))}
+                </Row>
+
+                <Form.Group className="mb-2"><Form.Label>Valor estimado mercado</Form.Label><Form.Control type="number" value={formik.values.valorEstimadoMercado as any} onChange={(e)=>formik.setFieldValue("valorEstimadoMercado", e.target.value)} /></Form.Group>
+                <Form.Group className="mb-2"><Form.Label>Valor liquidación</Form.Label><Form.Control type="number" value={formik.values.valorLiquidacion as any} onChange={(e)=>formik.setFieldValue("valorLiquidacion", e.target.value)} /></Form.Group>
+                <Form.Group className="mb-2"><Form.Label>Conclusiones</Form.Label><Form.Control as="textarea" rows={4} value={formik.values.conclusiones} onChange={(e)=>formik.setFieldValue("conclusiones", e.target.value)} /></Form.Group>
+
+                <div className="d-flex gap-2">
+                  <Button onClick={() => {
+                    // export JSON and save to localStorage (also create a download)
+                    const payload = JSON.stringify(formik.values, null, 2);
+                    saveAvaluo(formik.values);
+                    const blob = new Blob([payload], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url; a.download = `avaluo_${Date.now()}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}>Guardar JSON + Descargar</Button>
+                  <Button variant="primary" onClick={() => { formik.handleSubmit(); }}>Guardar</Button>
+                </div>
+              </>
+            )}
+
+            <div className="mt-3 d-flex justify-content-between">
+              <div>
+                {step > 1 && <Button variant="secondary" onClick={prev}>Atrás</Button>}
+              </div>
+              <div>
+                {step < 8 && <Button onClick={next}>Siguiente</Button>}
+                {step === 8 && <Button type="submit" className="ms-2">Finalizar y guardar</Button>}
+              </div>
+            </div>
+
+          </Form>
+        </Card.Body>
+      </Card>
     </div>
   );
-};
-
-export default AvaluoForm;
+}
