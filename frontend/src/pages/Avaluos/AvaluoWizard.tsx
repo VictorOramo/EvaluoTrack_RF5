@@ -451,8 +451,6 @@ export default function FormAvaluo() {
                           </Col>
                         </Row>
                       </Form.Group>
-
-
                       <Form.Group className="mb-2">
                         {renderLabel("lat", "Coordenadas (Latitud)")}
                         <InputGroup className="mb-1">
