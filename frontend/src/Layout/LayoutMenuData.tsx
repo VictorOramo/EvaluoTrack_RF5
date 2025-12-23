@@ -835,6 +835,13 @@ const Navdata = () => {
                 { id: 9, label: "Editors", link: "/forms-editors", parentId: "forms" },
                 { id: 10, label: "File Upload", link: "/forms-file-uploads", parentId: "forms" },
                 { id: 11, label: "Form Layout", link: "/forms-layouts", parentId: "forms" },
+                {//URL para formulario de avaluo
+                    id: "avaluo-form",
+                    label: "Formulario de Avalúo",
+                    link: "/avaluo/create",
+                    parentId: "forms",
+                },
+
             ],
         },
         {
