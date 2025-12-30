@@ -30,12 +30,22 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.get("/api/prueba", (req, res) => {
+  res.json({
+    success: true,
+    mensaje: "Conexión frontend-backend OK"
+  });
+
 app.use('/api/expedientes', expedientesRoutes);
 app.use('/api/fichas', fichasRoutes);
 app.use('/api/anexos', anexosRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
+
+
+});
+
 
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);

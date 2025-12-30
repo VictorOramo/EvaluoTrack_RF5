@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>EvaluoTrack Frontend</title>
+</head>
+<body>
+
+<h2>Prueba de conexión</h2>
+<button id="btn">Conectar con backend</button>
+
+<script>
+document.getElementById("btn").onclick = () => {
+  fetch("http://localhost:3000/api/prueba")
+    .then(res => res.json())
+    .then(data => alert(data.mensaje))
+    .catch(err => console.error(err));
+};
+</script>
+
+</body>
+</html>
