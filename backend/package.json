@@ -4,34 +4,16 @@
   "description": "Backend para EvaluoTrack - Sistema de tasación catastral (RF5)",
   "main": "src/index.js",
   "type": "module",
-
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
-    "db:migrate": "prisma migrate dev",
-    "db:deploy": "prisma migrate deploy",
-    "db:seed": "node prisma/seed.js",
-    "db:studio": "prisma studio",
-    "db:reset": "prisma migrate reset",
-    "db:generate": "prisma generate",
-    "test:db": "node src/config/testConnection.js",
-    "test:postgis": "node src/config/testPostGIS.js",
-    "keep-alive": "node src/config/keepAlive.js"
+    "start": "node src/index.mjs",
+    "dev": "nodemon src/index.mjs"
   },
-  "keywords": [
-    "catastro",
-    "tasacion",
-    "postgis"
-  ],
-  "author": "Grupo 3 - UAPA",
-  "license": "ISC",
   "dependencies": {
-    "@prisma/client": "^5.22.0",
-    "cors": "^2.8.5",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
-    "nodemon": "^3.1.11",
-    "prisma": "^5.22.0"
+    "nodemon": "^3.1.11"
   }
 }
+

@@ -11,7 +11,7 @@
 
 <script>
 document.getElementById("btn").onclick = () => {
-  fetch("http://localhost:3000/api/prueba")
+  fetch("http://localhost:4000/api/prueba")
     .then(res => res.json())
     .then(data => alert(data.mensaje))
     .catch(err => console.error(err));
