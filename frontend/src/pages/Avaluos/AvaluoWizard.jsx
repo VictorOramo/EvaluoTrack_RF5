@@ -93,7 +93,6 @@ export default function FormAvaluo() {
     try {
         const totalAreaConstruida = values.pisos.areas.reduce((acc, val) => acc + Number(val || 0), 0);
         
-        // Mapeo de los valores del Wizard a los ENUMS de Prisma
         const mapearTipoInmueble = (tipo) => {
             const mapa = {
                 "Apartamento": "RESIDENCIAL",
@@ -115,35 +114,63 @@ export default function FormAvaluo() {
             direccionInmueble: `${values.calle} #${values.numero}, ${values.sector}`,
             municipio: values.ciudad,
             provincia: values.ciudad,
-            
-            // Estructura anidada según tu esquema
             fichaCatastral: {
                 create: {
                     areaTerreno: parseFloat(values.areaM2) || 0,
                     areaConstruida: parseFloat(totalAreaConstruida) || 0,
-                    // Usamos el mapeo para que Prisma no de error
                     tipoInmueble: mapearTipoInmueble(values.tipoInmueble[0]),
                     antiguedad: parseInt(values.antiguedadAprox) || 0,
                     valorTotal: parseFloat(values.valorEstimadoMercado) || 0,
-                    estadoConservacion: "BUENO", // Debe ser EXCELENTE, BUENO, REGULAR, MALO o RUINA
+                    estadoConservacion: "BUENO",
                     moneda: "DOP",
                     situacionLegal: "REGULAR"
                 }
             }
         };
 
+        // 1. Guardar Expediente y Ficha
         const res = await AvaluosService.crearExpediente(payload);
         
-        // Lógica para anexos (coordenadas PostGIS)
-        if (values.lat && values.lng && res.data?.id) {
-            // ... aquí sigues con tu lógica de agregarCoordenadas
+        // Obtenemos el ID del expediente recién creado
+        const expedienteId = res.data?.id || res.data?.data?.id;
+
+        // 2. Lógica para Anexo de Coordenadas (PostGIS)
+        if (expedienteId && values.lat && values.lng) {
+            console.log("Guardando coordenadas para expediente:", expedienteId);
+            
+            const anexoPayload = {
+                expedienteId: expedienteId,
+                tipoAnexo: "COORDENADAS", // Coincide con tu Enum TipoAnexo
+                nombreArchivo: "UBICACION_GPS",
+                rutaArchivo: "GEOM",
+                tamanoBytes: 1,
+                mimeType: "application/json",
+                descripcion: `Lat: ${values.lat}, Lng: ${values.lng}`
+            };
+
+            // Creamos el registro del anexo
+            const resAnexo = await AvaluosService.crearAnexo(anexoPayload);
+            const anexoId = resAnexo.data?.id || resAnexo.data?.data?.id;
+
+            // 3. Ejecutamos la actualización de la geometría PostGIS
+            if (anexoId) {
+                await AvaluosService.agregarCoordenadas(anexoId, {
+                    latitud: parseFloat(values.lat),
+                    longitud: parseFloat(values.lng)
+                });
+            }
         }
 
-        setSavedMessage("¡Expediente y Ficha guardados correctamente!");
+        setSavedMessage("¡Avalúo completo con GPS guardado!");
+        resetForm();
         clearAvaluo();
+        setStep(1); // Reiniciamos el formulario
+        setAttemptNext(false);
+
+
     } catch (error) {
-        console.error("Error detallado:", error.response?.data);
-        setToastError("Error al guardar: " + (error.response?.data?.error || "Datos inválidos"));
+        console.error("Error en el proceso:", error.response?.data || error);
+        setToastError("Error: " + (error.response?.data?.error || "No se pudo completar el registro"));
     } finally {
         setLoading(false);
     }
@@ -178,7 +205,7 @@ const removeHabitacion = (i) => {
   formik.setFieldValue("habitaciones", arr);
 };
 
-// Funciones para manejar la lista de Comparables (Paso 7)
+
 const addComparable = () => {
   const arr = [...formik.values.comparables];
   arr.push({ direccion: "", fechaVenta: "", precio: "", m2: "", ajustes: "" });
@@ -191,16 +218,16 @@ const removeComparable = (i) => {
   formik.setFieldValue("comparables", arr);
 };
 
-// --- NAVEGACIÓN ---
+
   const next = () => {
-    // Validamos si existen campos obligatorios definidos para el paso actual
+ 
     const fields = stepFields[step] || [];
     setAttemptNext(true);
 
-    // Marcamos los campos como "tocados" para que Formik muestre el error visual
+    
     fields.forEach((field) => formik.setFieldTouched(field, true, true));
 
-    // Comprobamos si falta algún valor obligatorio
+    
     const missing = fields.filter((field) => {
       const val = formik.values[field];
       return val === undefined || val === null || (typeof val === "string" && val.trim() === "");
@@ -235,7 +262,13 @@ const removeComparable = (i) => {
       setToastError("Error al cargar las fotografías.");
     }
   };
-
+    // DEBUG: Esto imprimirá en la consola por qué no se envía el formulario
+        useEffect(() => {
+        if (formik.submitCount > 0 && Object.keys(formik.errors).length > 0) {
+        console.log("❌ Bloqueado por validación de Yup:", formik.errors);
+        setToastError("Faltan campos obligatorios o tienen formato incorrecto.");
+    }
+}, [formik.submitCount, formik.errors]);
     return (
         <FormikProvider value={formik}>
             <div className="avaluo-page container-fluid py-4">
@@ -366,11 +399,26 @@ const removeComparable = (i) => {
                         className="mb-2 shadow-sm"
                     />
                     <Form.Control
-                        placeholder="Cédula o Identificación"
-                        value={formik.values.valuadorIdentificacion}
-                        onChange={(e) => formik.setFieldValue("valuadorIdentificacion", e.target.value)}
-                        className="shadow-sm"
-                    />
+  placeholder="000-0000000-0"
+  value={formik.values.valuadorIdentificacion}
+  isInvalid={!!formik.errors.valuadorIdentificacion}
+  onChange={(e) => {
+    let val = e.target.value.replace(/\D/g, ""); // Quita letras
+    if (val.length > 11) val = val.slice(0, 11); // Límite de cédula
+    
+    // Formatea: 000-0000000-0
+    if (val.length > 3 && val.length <= 10) {
+      val = `${val.slice(0, 3)}-${val.slice(3)}`;
+    } else if (val.length > 10) {
+      val = `${val.slice(0, 3)}-${val.slice(3, 10)}-${val.slice(10)}`;
+    }
+    
+    formik.setFieldValue("valuadorIdentificacion", val);
+  }}
+/>
+<Form.Control.Feedback type="invalid">
+  {formik.errors.valuadorIdentificacion}
+</Form.Control.Feedback>
                 </Form.Group>
 
                 <Form.Group>

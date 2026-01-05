@@ -17,5 +17,6 @@ router.get('/expediente/:expedienteId/coordenadas', obtenerAnexosConCoordenadas)
 router.get('/:id', obtenerAnexo);
 router.delete('/:id', eliminarAnexo);
 router.post('/:id/coordenadas', validarCoordenadas, agregarCoordenadas);
+router.get('/:id/coordenadas', agregarCoordenadas);
 
 export default router;

@@ -106,47 +106,30 @@ export const agregarCoordenadas = async (req, res) => {
   try {
     const { id } = req.params;
     const { latitud, longitud } = req.body;
-    
-    if (!latitud || !longitud) {
-      return res.status(400).json({
-        success: false,
-        error: 'Se requieren latitud y longitud'
-      });
-    }
-    
-    await prisma.$executeRaw`
-      UPDATE anexos 
-      SET coordenadas = ST_SetSRID(ST_MakePoint(${longitud}, ${latitud}), 4326)
-      WHERE id = ${id}::uuid
-    `;
-    
-    const anexoActualizado = await prisma.anexo.findUnique({
-      where: { id }
-    });
-    
-    const coordenadasTexto = await prisma.$queryRaw`
-      SELECT ST_AsText(coordenadas) as punto, 
-             ST_X(coordenadas) as longitud,
-             ST_Y(coordenadas) as latitud
-      FROM anexos 
-      WHERE id = ${id}::uuid
-    `;
-    
-    res.json({
-      success: true,
-      data: {
-        ...anexoActualizado,
-        coordenadasLegibles: coordenadasTexto[0]
-      }
-    });
+
+    // 1. Verificación en consola (Terminal de Node)
+    console.log(`>>> INTENTANDO POSTGIS - ID: ${id}`);
+
+    // 2. Usamos executeRawUnsafe con marcadores $1, $2, $3
+    // Esto obliga a Postgres a recibir los datos y convertirlos al vuelo
+    await prisma.$executeRawUnsafe(
+      `UPDATE "anexos" 
+       SET "coordenadas" = ST_SetSRID(ST_MakePoint($1, $2), 4326) 
+       WHERE "id" = $3::uuid`,
+      parseFloat(longitud), 
+      parseFloat(latitud), 
+      id
+    );
+
+    res.json({ success: true, message: "Coordenadas guardadas en PostGIS" });
   } catch (error) {
+    console.error("ERROR REAL EN EL SERVIDOR:", error.message);
     res.status(400).json({
       success: false,
-      error: error.message
+      error: "Error de tipos: " + error.message
     });
   }
 };
-
 export const obtenerAnexosConCoordenadas = async (req, res) => {
   try {
     const { expedienteId } = req.params;
@@ -165,8 +148,8 @@ export const obtenerAnexosConCoordenadas = async (req, res) => {
         ST_AsText(a.coordenadas) as punto,
         ST_X(a.coordenadas) as longitud,
         ST_Y(a.coordenadas) as latitud
-      FROM anexos a
-      WHERE a."expedienteId"::text = ${expedienteId}
+        FROM anexos a
+        WHERE a."expedienteId" = CAST(${expedienteId} AS uuid)
         AND a.coordenadas IS NOT NULL
       ORDER BY a."fechaSubida" DESC
     `;
