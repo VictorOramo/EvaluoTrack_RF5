@@ -162,7 +162,6 @@ export default function FormAvaluo() {
         }
 
         setSavedMessage("¡Avalúo completo con GPS guardado!");
-        resetForm();
         clearAvaluo();
         setStep(1); // Reiniciamos el formulario
         setAttemptNext(false);
