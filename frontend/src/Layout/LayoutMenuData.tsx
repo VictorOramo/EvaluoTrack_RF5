@@ -194,7 +194,7 @@ const Navdata = () => {
 
         {
             id: "forms",
-            label: "Forms",
+            label: "Registro Avaluos",
             icon: "ri-file-list-3-line",
             link: "/#",
             click: function (e: any) {
